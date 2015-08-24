@@ -1,0 +1,152 @@
+
+# to enable ruboto project debugging...
+
+Gemfile & Gemfile.apk:
+  source "http://rubygems.org"
+  gem 'ruby-debug-base', '0.10.5.rc9'
+  gem 'ruby-debug', '0.10.5.rc9'
+
+$ bundle install
+
+$ vim src/debugging_activity.rb
+  require 'ruby-debug'
+  ...
+  Debugger.wait_connection = true
+  Debugger.start_remote
+  debugger
+  ...
+
+$ rake clean
+
+# change rake bundle to keep bundle directory so local changes will be preserved across builds
+$ vim rakelib/ruboto.rake      # comment out line 875 : FileUtils.rm_rf BUNDLE_PATH
+
+$ rake bundle
+Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Fetching gem metadata from http://rubygems.org/.....
+Fetching version metadata from http://rubygems.org/..
+Resolving dependencies...
+Installing columnize 0.9.0
+Installing linecache 0.46
+Installing ruby-debug-base 0.10.5.rc9
+Installing ruby-debug 0.10.5.rc9
+Using bundler 1.10.6
+Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems
+rake aborted!
+Errno::ENOENT: No such file or directory - ruby-debug-0.10.5.rc9/lib
+/home/gerard/dev/ruboto-debug/rakelib/ruboto.rake:748:in `(root)'
+/home/gerard/dev/ruboto-debug/rakelib/ruboto.rake:747:in `(root)'
+/home/gerard/dev/ruboto-debug/rakelib/ruboto.rake:746:in `(root)'
+Tasks: TOP => bundle => /home/gerard/dev/ruboto-debug/libs/bundle.jar
+(See full trace by running task with --trace)
+
+# rake-debug gem has non-default require_path (cli) in gemspec, symlink a lib dir so rake bundle can include files
+$ cd bin/bundle/gems/ruby-debug-0.10.5.rc9
+$ ln -s cli lib
+$ cd ..
+
+# rake-debug-base gem reports no such method "frame_binding" because alias is before method ? (works in jruby on ubuntu, not on android)
+$ cd ruby-debug-base-0.10.5.rc9-java/lib
+$ vim ruby-debug-base.rb      # move line: "alias __c_frame_binding frame_binding" to after method frame_binding
+$ cd ../..
+
+# rake-debug tries to require readline but does not rescue the exception raised on Android
+$ cd ruby-debug-0.10.5.rc9/cli/ruby-debug
+$ vim interface.rb            # rescue all exceptions raised by require 'readline' : lines 16, 135 
+$ cd ../../..
+
+# ruby-debug irb command uses ruby irb which insists on trying readline, disable command
+$ cd ruby-debug-0.10.5.rc9/cli/ruby-debug/commands
+$ mv irb.rb irb.rb.disable
+$ cd ../../../..
+
+# at this point an Android activity with require 'ruby-debug' will start without error...
+# apart from the non-fatal "java.security.NoSuchAlgorithmException: MessageDigest MD2 implementation not found"
+
+# add code for ruboto.rake for JRuby to load RubyDebugService from jar at startup
+$ vim rakelib/ruboto.rake   # line 818...
+          elsif jar =~ %r{ruby_debug.jar$}
+            jar_load_code = <<-END_CODE
+require 'jruby'
+puts 'Starting Ruby Debug Service'
+public
+Java::RubyDebugService.new.basicLoad(JRuby.runtime)
+            END_CODE
+
+$ cd ../../..
+
+# backup bundle
+$ cp --archive bin/bundle bundle_backup
+
+# replace bundle after rake clean for repeated builds
+$ rake clean
+$ mkdir -p bin/bundle
+$ cp --archive bundle_backup/* bin/bundle
+$ rm libs/bundle.jar
+
+$ rake bundle
+Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Using columnize 0.9.0
+Using linecache 0.46
+Using ruby-debug-base 0.10.5.rc9
+Using ruby-debug 0.10.5.rc9
+Using bundler 1.10.6
+Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems
+Expanding ruby-debug-base-0.10.5.rc9-java ruby_debug.jar into /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Writing dummy JAR file ruby_debug.jar.rb
+Writing dummy JAR file ruby_debug.rb
+Removing duplicate file META-INF/MANIFEST.MF in gem ruby-debug-base-0.10.5.rc9-java.
+Already present in the Ruby Standard Library.
+
+# libs/bundle.jar should be dexed
+$ rake debug
+...
+-dex:
+    [apply] Result: 2
+     [echo] The package contains too many methods.  Switching to multi-dex build.
+     [echo] Converting compiled files and external libraries into /home/gerard/dev/ruboto-debug/bin (multi-dex)
+     [echo] Dexing /home/gerard/dev/ruboto-debug/bin/classes and /home/gerard/dev/ruboto-debug/libs/dx.jar:/home/gerard/dev/ruboto-debug/libs/jruby-stdlib-1.7.19.jar:/home/gerard/dev/ruboto-
+debug/libs/bundle.jar:/home/gerard/dev/ruboto-debug/libs/jruby-core-1.7.19.jar
+...
+
+# jruby interpreted mode required to use debugger from ruby
+# ruby -Xcompile.mode=OFF ./dtest.rb
+# how to enable interpreted mode for Ruboto application start ?
+# looks like it already is:
+# see line 144: System.setProperty("jruby.compile.mode", "OFF"); at: https://github.com/ruboto/ruboto/blob/1a518429e613a5fca87c03f7dcdd5b3fac06d9f2/assets/src/org/ruboto/JRubyAdapter.java
+
+# how to enable --debug flag ?
+# file:/data/app/net.iqeo.debugging-1.apk!/ruby-debug-base.rb:210 warning: tracing (e.g. set_trace_func) will not capture all events without --debug flag
+
+# org.jruby.exceptions.RaiseException: (Errno::EACCES) bind(2)
+#     at org.jruby.ext.socket.RubyTCPServer.initialize(org/jruby/ext/socket/RubyTCPServer.java:124)
+$ vim AndroidManifest.xml  # add permission
+    <uses-permission android:name='android.permission.INTERNET'/>
+
+# forward remote debugger ports from emulator/device to local system
+$ adb forward tcp:8989 tcp:8989
+$ adb forward tcp:8990 tcp:8990
+$ adb forward --list
+
+# start app
+
+# debugger code in button onClick handler
+
+# click button: debugger waits for connection but reports stack overflow
+ threadid=1: stack overflow on call to Lorg/jruby/debug/DebugEventHook;.eventHandler:VLLLILL
+   method requires 60+20+32=112 bytes, fp is 0xb0a8b354 (84 left)
+   expanding stack end (0xb0a8b300 to 0xb0a8b000)
+ Shrank stack (to 0xb0a8b300, curFrame is 0xb0a8b478)
+
+# debugger client
+$ rdebug --client
+
+# Says connected but nothing else, app continues immediately
+# repeated button clicks repeat stack overflow, app continues immediately without debugger client connection
+
+
+# debugger code in onCreate method
+
+
+
+

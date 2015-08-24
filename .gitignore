@@ -1,0 +1,10 @@
+*~
+.idea/
+.directory
+bin/*
+gen/*
+tmp/*
+*.log
+.*.un~
+.*.swp
+

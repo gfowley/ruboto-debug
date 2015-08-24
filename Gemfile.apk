@@ -1,0 +1,4 @@
+source "http://rubygems.org"
+gem 'ruby-debug-base', '0.10.5.rc9'
+gem 'ruby-debug', '0.10.5.rc9'
+

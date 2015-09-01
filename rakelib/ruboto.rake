@@ -745,7 +745,8 @@ file BUNDLE_JAR => [GEM_FILE, GEM_LOCK_FILE] do
   # Expand JARs
   Dir.chdir gem_path do
     Dir['*'].each do |gem_lib|
-      Dir.chdir "#{gem_lib}/lib" do
+      require_path = gem_lib =~ /^ruby-debug-\d/ ? 'cli' : 'lib' # special case for ruby-debug gem, this is rotten hack - GemSpecification#require_paths would be better
+      Dir.chdir "#{gem_lib}/#{require_path}" do
         Dir['**/*.jar'].each do |jar|
           unless jar =~ /sqlite-jdbc/
             puts "Expanding #{gem_lib} #{jar} into #{BUNDLE_JAR}"
@@ -817,7 +818,6 @@ end
             END_CODE
           elsif jar =~ %r{ruby_debug.jar$}
             jar_load_code = <<-END_CODE
-require 'jruby'
 puts 'Starting Ruby Debug Service'
 public
 Java::RubyDebugService.new.basicLoad(JRuby.runtime)
@@ -877,7 +877,8 @@ Java::RubyDebugService.new.basicLoad(JRuby.runtime)
 
   FileUtils.rm_f BUNDLE_JAR
   Dir["#{gem_path}/*"].each_with_index do |gem_dir, i|
-    `jar #{i == 0 ? 'c' : 'u'}f "#{BUNDLE_JAR}" -C "#{gem_dir}/lib" .`
+    require_path = gem_dir =~ /ruby-debug-\d/ ? 'cli' : 'lib' # special case for ruby-debug gem, this is rotten hack - GemSpecification#require_paths would be better
+    `jar #{i == 0 ? 'c' : 'u'}f "#{BUNDLE_JAR}" -C "#{gem_dir}/#{require_path}" .`
   end
   # FileUtils.rm_rf BUNDLE_PATH
 end

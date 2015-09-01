@@ -1,20 +1,22 @@
 GEM
-  remote: http://rubygems.org/
+  remote: file:/home/gerard/dev/ruboto-debug/gemdir/
   specs:
     columnize (0.9.0)
     linecache (0.46-java)
-    ruby-debug (0.10.5.rc9)
+    ruby-debug (0.10.6)
       columnize (>= 0.1)
-      ruby-debug-base (~> 0.10.5.rc9.0)
-    ruby-debug-base (0.10.5.rc9-java)
       linecache (~> 0.46)
+      ruby-debug-base (~> 0.10.6.0)
+    ruby-debug-base (0.10.6-java)
 
 PLATFORMS
   java
 
 DEPENDENCIES
-  ruby-debug (= 0.10.5.rc9)
-  ruby-debug-base (= 0.10.5.rc9)
+  columnize (= 0.9.0)
+  linecache (= 0.46)
+  ruby-debug (= 0.10.6)
+  ruby-debug-base (= 0.10.6)
 
 BUNDLED WITH
    1.10.6

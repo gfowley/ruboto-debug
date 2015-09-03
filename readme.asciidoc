@@ -1,0 +1,637 @@
+Ruboto Project Debugging
+========================
+:toc:
+
+= Ruboto project debugging _(the hard way)_
+
+Changes are required for ruby-debug gems, and Ruboto.
+
+== Ruby Debug
+
+Gems ruby-debug and ruby-debug-base are generated from a single source repository. The repository is cloned locally to make changes and generate gems. The original is at https://github.com/ruby-debug/ruby-debug. For this tutorial a repository with the required changes is available. This repository will always contain the changes described in this tutorial. Clone it locally.
+
+[source,shell]
+----
+git clone https://github.com/gfowley/ruby-debug
+----
+
+=== Dev environment
+
+This project repository and this tutorial assume jruby-1.7.19 is being used locally.
+
+[source,shell]
+----
+ruby -v
+----
+----
+jruby 1.7.19 (1.9.3p551) 2015-01-29 20786bd on Java HotSpot(TM) 64-Bit Server VM 1.8.0_51-b16 +jit [linux-amd64]
+----
+
+RVM .ruby-* files implement a project ruby version and gemset to prevent collisions with the ruboto-debug repository.
+
+.ruby-version
+----
+jruby-1.7.19
+----
+
+.ruby-gemset
+----
+ruby-debug
+----
+
+[source,shell]
+----
+rvm current
+----
+----
+jruby-1.7.19@ruby-debug
+----
+
+=== Gem ruby-debug
+
+Requires readline but does not rescue the exception raised on Android. Rescue all exceptions raised by 'require "readline"'.
+
+.cli/ruby-debug/interface.rb:16 & 135
+[source,ruby]
+----
+rescue LoadError, ArgumentError
+----
+
+Debugger irb command uses Ruby IRB which tries to load readline. Quickest fix is to disable the command by renaming the command script so it will not be loaded.
+
+[source,shell]
+----
+mv cli/ruby-debug/commands/irb.rb cli/ruby-debug/commands/irb.rb.disabled
+----
+
+TODO: Rescue exceptions raised loading all commands.
+
+=== Gem ruby-debug-base (java)
+
+The current version (0.10.6) of gem ruby-debug-base for java is not available via 'gem install'. No changes are required but it must be built locally.
+
+TODO: Request inclusion of Java platform gem in ruby-debug-base gem distribution.
+
+=== Building gems
+
+Test changes. Even unchanged, 'cli' tests fail, only run 'base' tests.
+
+[source,shell]
+----
+rake test:base
+----
+----
+...
+
+# Running tests:
+
+.......
+
+Finished tests in 0.068000s, 102.9412 tests/s, 558.8235 assertions/s.
+
+7 tests, 38 assertions, 0 failures, 0 errors, 0 skips
+----
+
+Create gems.
+
+[source,shell]
+----
+rake clobber java gem
+----
+
+Check gems are created.
+
+[source,shell]
+----
+ls pkg -lh
+----
+----
+total 176K
+drwxrwxr-x 5 user user 4.0K Sep  1 12:36 ruby-debug-0.10.6
+-rw-rw-r-- 1 user user  53K Sep  1 12:36 ruby-debug-0.10.6.gem
+drwxrwxr-x 4 user user 4.0K Sep  1 12:36 ruby-debug-base-0.10.6
+-rw-rw-r-- 1 user user  33K Sep  1 12:36 ruby-debug-base-0.10.6.gem
+drwxrwxr-x 4 user user 4.0K Sep  1 12:36 ruby-debug-base-0.10.6-java
+-rw-rw-r-- 1 user user  69K Sep  1 12:36 ruby-debug-base-0.10.6-java.gem
+----
+
+== Ruboto project
+
+Changes to Ruboto are needed to work with ruby-debug. For this tutorial a repository of a sample default Ruboto project with the required changes is available. This repository will always contain the changes described in this tutorial. Clone it locally.
+
+[source,shell]
+----
+git clone https://github.com/gfowley/ruboto-debug
+----
+
+=== Dev environment
+
+This project repository and this tutorial assume jruby-1.7.19 is being used locally and bundled in the application jruby jars.
+
+[source,shell]
+----
+ruby -v
+----
+----
+jruby 1.7.19 (1.9.3p551) 2015-01-29 20786bd on Java HotSpot(TM) 64-Bit Server VM 1.8.0_51-b16 +jit [linux-amd64]
+----
+
+[source,shell]
+----
+ls libs
+----
+----
+bundle.jar  dx.jar  jruby-core-1.7.19.jar  jruby-stdlib-1.7.19.jar
+----
+
+RVM .ruby-* files implement a project ruby version and gemset to prevent collisions with the ruby-debug repository.
+
+.ruby-version
+----
+jruby-1.7.19
+----
+
+.ruby-gemset
+----
+ruboto-debug
+----
+
+[source,shell]
+----
+rvm current
+----
+----
+jruby-1.7.19@ruboto-debug
+----
+
+=== Ruboto changes
+
+The rake-debug gem specifies a non-default require_path ('cli') in its gemspec. Handle this special case when creating bundle.jar in ruboto.rake.
+
+.rakelib/ruboto.rake:748
+[source,ruby]
+----
+require_path = gem_lib =~ /^ruby-debug-\d/ ? 'cli' : 'lib'
+Dir.chdir "#{gem_lib}/#{require_path}" do
+----
+
+.rakelib/ruboto.rake:881
+[source,ruby]
+----
+require_path = gem_lib =~ /ruby-debug-\d/ ? 'cli' : 'lib' 
+`jar #{i == 0 ? 'c' : 'u'}f "#{BUNDLE_JAR}" -C "#{gem_dir}/#{require_path}" .`
+----
+
+TODO: Get gem require paths from gemspec - GemSpecification#require_paths. Somthing like...
+[quote]
+----
+gem_spec = YAML.load `gem specification #{gem_name} --version #{gem_version} --yaml`
+gem_spec.require_paths.each { |dir| ... }
+----
+
+Load RubyDebugService from bundle.jar at JRuby startup
+
+.rakelib/ruboto.rake:818
+[source,ruby]
+----
+elsif jar =~ %r{ruby_debug.jar$}
+  jar_load_code = <<-END_CODE
+require 'jruby'
+puts 'Starting Ruby Debug Service'
+public
+Java::RubyDebugService.new.basicLoad(JRuby.runtime)
+END_CODE
+----
+
+=== Activity
+
+When started in the application the debugger runs a TCP server to communicate with the debugger client. The application requires the 'android.permission.INTERNET' permission, otherwise an EACCES exception will be raised.
+----
+org.jruby.exceptions.RaiseException: (Errno::EACCES) bind(2)
+   at org.jruby.ext.socket.RubyTCPServer.initialize(org/jruby/ext/socket/RubyTCPServer.java:124)
+----
+
+.AndroidManifest.xml
+[source,xml]
+----
+<uses-permission android:name='android.permission.INTERNET'/>
+----
+
+To debug an activity, start the debugger for remote operation configured to wait for a connection from the debugger client. Once the debugger client is connected the application will contine execution after 'Debugger.start_remote' until the 'debugger' method is called. At that point the debugger client can debug the application. See the sample activity in the repository.
+
+.src/debugging_activity.rb
+[source,ruby]
+----
+require 'ruby-debug'
+
+class DebuggingActivity
+
+  def onCreate(bundle)
+    super
+
+    set_title 'Domo arigato, Mr Ruboto!'
+
+    Debugger.wait_connection = true
+    Debugger.start_remote         
+
+    Thread.start do
+      debugger
+      puts "onCreate: debugger session begin"
+      set_title 'Degugging Mr Ruboto!'
+      puts "onCreate: debugger session end"
+    end.join
+
+    self.content_view = linear_layout :orientation => :vertical do
+      @text_view = text_view :text => 'What hath Matz wrought?', :id => 42, 
+        :layout => {:width => :match_parent},
+        :gravity => :center, :text_size => 48.0
+      button :text => 'M-x butterfly', 
+        :layout => {:width => :match_parent},
+        :id => 43, :on_click_listener => proc { butterfly }
+    end
+  end
+
+  private
+
+  def butterfly
+    @text_view.text = 'What hath Matz wrought!'
+
+    Thread.start do
+      debugger
+      puts "butterfly: debugger session begin"
+      @text_view.text = 'Butterfly debugged!'
+      puts "butterfly: debugger session end"
+    end.join
+
+    toast 'Flipped a bit via butterfly'
+  end
+
+end
+----
+
+Note
+
+* The 'debugger' method is called from a separate thread, it does not seem to work when called from the UI thread.
+* The debugger thread is joined so that any changes made when debugging will affect the code following.
+* The debugger session ends when the debugger thread ends, all code to be debugged should be wrapped by the Thread.start block.
+
+=== Bundle
+
+Use locally created ruby-debug gems for bundle and bundle.jar.
+
+.Gemfile & Gemfile.apk
+[source,ruby]
+----
+source "file:///home/user/dev/ruboto-debug/gemdir"
+gem 'columnize',       '0.9.0'
+gem 'linecache',       '0.46'
+gem 'ruby-debug-base', '0.10.6'
+gem 'ruby-debug',      '0.10.6'
+----
+
+Create project gem directory and populate with dependency gems.
+
+[source,shell]
+----
+mkdir -p gemdir/gems
+cd gemdir/gems
+gem fetch linecache --version 0.46
+gem fetch columnize --version 0.9.0
+cd ../..
+----
+
+Locally created ruby-debug gems are located in the local ruby-debug repository at ../ruby-debug/pkg. To bundle them:
+
+* Copy/update ruby-debug gems in the project gem directory.
+* Generate a gem server index.
+* Delete bundler locks.
+* Uninstall ruby-debug gems (from project gemset if using rvm).
+* Bundle.
+* Create Ruboto bundle.jar.
+
+A shell script is provided to consistently create the local bundle and bundle.jar.
+
+.update_debug_gems.sh
+[source,shell]
+----
+#! /bin/bash
+rm -v gemdir/gems/ruby-debug*.gem
+cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
+cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
+gem generate --directory=gemdir
+rm -v Gemfile.lock
+rm -v Gemfile.apk.lock
+gem uninstall ruby-debug --executables
+gem uninstall ruby-debug-base
+bundle
+rm -v libs/bundle.jar
+rake bundle
+----
+
+This should be executed for changes to locally created ruby-debug gems or any other gems to be bundled for the application.
+
+[source,shell]
+----
+./update_debug_gems.sh
+----
+----
+removed ‘gemdir/gems/ruby-debug-0.10.6.gem’
+removed ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
+‘../ruby-debug/pkg/ruby-debug-0.10.6.gem’ -> ‘gemdir/gems/ruby-debug-0.10.6.gem’
+‘../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem’ -> ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
+Generating Marshal quick index gemspecs for 4 gems
+....
+Complete
+Generated Marshal quick index gemspecs: 0.015s
+Generating specs index
+Generated specs index: 0.002s
+Generating latest specs index
+Generated latest specs index: 0.001s
+Generating prerelease specs index
+Generated prerelease specs index: 0.001s
+Compressing indicies
+Compressed indicies: 0.004s
+removed ‘Gemfile.lock’
+removed ‘Gemfile.apk.lock’
+Removing rdebug
+Successfully uninstalled ruby-debug-0.10.6
+Successfully uninstalled ruby-debug-base-0.10.6-java
+Fetching source index from file:/home/user/dev/ruboto-debug/gemdir/
+Resolving dependencies...
+Using columnize 0.9.0
+Using linecache 0.46
+Installing ruby-debug-base 0.10.6
+Installing ruby-debug 0.10.6
+Using bundler 1.10.6
+Bundle complete! 4 Gemfile dependencies, 5 gems now installed.
+Gems in the groups development and test were not installed.
+Use `bundle show [gemname]` to see where a bundled gem is installed.
+removed ‘libs/bundle.jar’
+Jars have changed: bundle.jar
+Generating /home/user/dev/ruboto-debug/libs/bundle.jar
+Fetching source index from file:/home/user/dev/ruboto-debug/gemdir/
+Resolving dependencies...
+Installing columnize 0.9.0
+Installing linecache 0.46
+Installing ruby-debug-base 0.10.6
+Installing ruby-debug 0.10.6
+Using bundler 1.10.6
+Found gems in /home/user/dev/ruboto-debug/bin/bundle/gems
+Expanding ruby-debug-base-0.10.6-java ruby_debug.jar into /home/user/dev/ruboto-debug/libs/bundle.jar
+Writing dummy JAR file ruby_debug.jar.rb
+Writing dummy JAR file ruby_debug.rb
+Removing duplicate file META-INF/MANIFEST.MF in gem ruby-debug-base-0.10.6-java.
+Already present in the Ruby Standard Library.
+----
+
+=== Non-Ruboto debug test 
+
+To verify that locally created ruby-debug gems are functional, debug the provided sample script.
+
+[source,shell]
+----
+ruby -Xcompile.mode=OFF --debug ./dtest.rb
+----
+----
+???
+----
+
+Start debugger cient in another shell (with same ruby and gems).
+
+[source,shell]
+----
+rdebug --client
+----
+----
+???
+----
+
+Verify that the debugger works. See debugger client docs at http://???.
+
+----
+list
+display n
+next
+next
+finish
+----
+----
+???
+----
+
+=== Build and install app
+
+NOTE: This tutorial has been tested on an x86-based emulator and API 19 only. Feedback regarding results on other emulators, APIs, and devices welcome.
+
+Connect device or start emulator, verify adb communication.
+
+[source,shell]
+----
+adb devices
+----
+----
+???
+----
+
+Build Ruboto app, verify that libs/bundle.jar is dexed, (re)install, and ready log capture.
+
+[source,shell]
+----
+rake clean debug reinstall log
+----
+----
+...
+-dex:
+    [apply] Result: 2
+     [echo] The package contains too many methods.  Switching to multi-dex build.
+     [echo] Converting compiled files and external libraries into /home/user/dev/ruboto-debug/bin (multi-dex)
+     [echo] Dexing /home/user/dev/ruboto-debug/bin/classes and /home/user/dev/ruboto-debug/libs/dx.jar:/home/user/dev/ruboto-debug/libs/jruby-stdlib-1.7.19.jar:/home/user/dev/ruboto-
+debug/libs/bundle.jar:/home/user/dev/ruboto-debug/libs/jruby-core-1.7.19.jar
+...
+----
+
+=== Start app
+
+Launch application on device. Observe the following logs.
+
+UnixSocketChannel warnings, triggered by RubyDebugService (harmless?).
+----
+20150901 155558.944000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155558.944000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155558.944000 E/dalvikvm( 1895): Could not find class 'jnr.unixsocket.UnixSocketChannel', referenced from method org.jruby.ext.socket.RubySocket.initFieldsFromDescriptor
+20150901 155558.944000 W/dalvikvm( 1895): VFY: unable to resolve instanceof 1619 (Ljnr/unixsocket/UnixSocketChannel;) in Lorg/jruby/ext/socket/RubySocket;
+20150901 155558.944000 D/dalvikvm( 1895): VFY: replacing opcode 0x20 at 0x0015
+20150901 155558.945000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155558.945000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155558.945000 E/dalvikvm( 1895): Could not find class 'jnr.unixsocket.UnixSocketChannel', referenced from method org.jruby.ext.socket.RubySocket.doBind
+20150901 155558.945000 W/dalvikvm( 1895): VFY: unable to resolve instanceof 1619 (Ljnr/unixsocket/UnixSocketChannel;) in Lorg/jruby/ext/socket/RubySocket;
+20150901 155558.945000 D/dalvikvm( 1895): VFY: replacing opcode 0x20 at 0x0010
+20150901 155558.945000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155558.945000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155558.945000 E/dalvikvm( 1895): Could not find class 'jnr.unixsocket.UnixSocketChannel', referenced from method org.jruby.ext.socket.RubySocket.doConnect
+20150901 155558.945000 W/dalvikvm( 1895): VFY: unable to resolve instanceof 1619 (Ljnr/unixsocket/UnixSocketChannel;) in Lorg/jruby/ext/socket/RubySocket;
+20150901 155558.945000 D/dalvikvm( 1895): VFY: replacing opcode 0x20 at 0x003d
+20150901 155558.945000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155558.945000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155558.945000 I/dalvikvm( 1895): Could not find method jnr.unixsocket.UnixSocketChannel.open, referenced from method org.jruby.ext.socket.RubySocket.initChannel
+20150901 155558.946000 W/dalvikvm( 1895): VFY: unable to resolve static method 10681: Ljnr/unixsocket/UnixSocketChannel;.open ()Ljnr/unixsocket/UnixSocketChannel;
+20150901 155558.953000 D/dalvikvm( 1895): VFY: replacing opcode 0x71 at 0x0012
+----
+
+Start of RubyDebugService upon JRuby startup.
+----
+20150901 155559.012000 I/System.out( 1895): Starting Ruby Debug Service
+----
+
+MessageDigest MD2 warning (seems to be harmless).
+----
+20150901 155600.808000 W/System.err( 1895): java.security.NoSuchAlgorithmException: MessageDigest MD2 implementation not found
+...
+----
+
+Tracing without --debug flag. According to ruby-debug docs this will prevent its line tracing feature from working.
+----
+20150901 155601.083000 I/System.out( 1895): file:/data/app/net.iqeo.debugging-1.apk!/ruby-debug-base.rb:196 warning: tracing (e.g. set_trace_func) will not capture all events without --debug flag
+----
+TODO: Start application JRuby with --debug ?
+
+UnixSocketChannel warnings, triggered by Debugger.start_remote (harmless?).
+Is this caused by start_remote or when client connects to debugger session ???.
+----
+20150901 155601.117000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155601.117000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155601.117000 E/dalvikvm( 1895): Could not find class 'jnr.unixsocket.UnixSocketChannel', referenced from method org.jruby.ext.socket.SocketType.forChannel
+20150901 155601.117000 W/dalvikvm( 1895): VFY: unable to resolve instanceof 1619 (Ljnr/unixsocket/UnixSocketChannel;) in Lorg/jruby/ext/socket/SocketType;
+20150901 155601.117000 D/dalvikvm( 1895): VFY: replacing opcode 0x20 at 0x0015
+20150901 155601.117000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155601.117000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155601.117000 E/dalvikvm( 1895): Could not find class 'jnr.unixsocket.UnixSocketChannel', referenced from method org.jruby.ext.socket.SocketType$4.toSocket
+20150901 155601.117000 W/dalvikvm( 1895): VFY: unable to resolve check-cast 1619 (Ljnr/unixsocket/UnixSocketChannel;) in Lorg/jruby/ext/socket/SocketType$4;
+20150901 155601.117000 D/dalvikvm( 1895): VFY: replacing opcode 0x1f at 0x0000
+20150901 155601.118000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155601.118000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155601.118000 W/dalvikvm( 1895): VFY: unable to find class referenced in signature (Ljnr/unixsocket/UnixSocketChannel;)
+20150901 155601.118000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155601.118000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155601.118000 I/dalvikvm( 1895): Could not find method jnr.unixsocket.UnixSocketChannel.shutdownInput, referenced from method org.jruby.ext.socket.SocketType$4.shutdownInput
+20150901 155601.118000 W/dalvikvm( 1895): VFY: unable to resolve virtual method 10686: Ljnr/unixsocket/UnixSocketChannel;.shutdownInput ()V
+20150901 155601.118000 D/dalvikvm( 1895): VFY: replacing opcode 0x6e at 0x0004
+20150901 155601.118000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155601.118000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155601.118000 W/dalvikvm( 1895): VFY: unable to find class referenced in signature (Ljnr/unixsocket/UnixSocketChannel;)
+20150901 155601.118000 W/dalvikvm( 1895): Unable to resolve superclass of Ljnr/unixsocket/UnixSocketChannel; (1226)
+20150901 155601.118000 W/dalvikvm( 1895): Link of class 'Ljnr/unixsocket/UnixSocketChannel;' failed
+20150901 155601.118000 I/dalvikvm( 1895): Could not find method jnr.unixsocket.UnixSocketChannel.shutdownOutput, referenced from method org.jruby.ext.socket.SocketType$4.shutdownOutput
+20150901 155601.118000 W/dalvikvm( 1895): VFY: unable to resolve virtual method 10687: Ljnr/unixsocket/UnixSocketChannel;.shutdownOutput ()V
+20150901 155601.123000 D/dalvikvm( 1895): VFY: replacing opcode 0x6e at 0x0004
+----
+
+== Debugging
+
+Open another shell (with same ruby and gems).
+
+=== Communication
+
+Debugger TCP ports should be forwarded from the connected device or emulator to host system. It is also possible to debug remotely over a network, the device IP address is required, see ruby-debug docs for details.
+
+[source,shell]
+----
+adb forward tcp:8989 tcp:8989
+adb forward tcp:8990 tcp:8990
+adb forward --list
+----
+----
+emulator-xxxx tcp:8989 tcp:8989
+emulator-xxxx tcp:8990 tcp:8990
+----
+
+=== Debugger client
+
+Start debugger client, verify it connects to application remote debugger.
+
+[source,shell]
+----
+rdebug --client
+----
+----
+Connected.
+(rdb:4) _
+----
+
+=== Debugger session
+
+Example debugger sessions with this tutorial Ruboto app.
+
+==== Session in onCreate method.
+
+----
+Connected.                                                                                                                                                                            [8/1338]
+(rdb:4) list
+[-9, 0] in jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb
+(rdb:4) display self.title
+1: self.title = Domo arigato, Mr Ruboto!
+(rdb:4) next
+1: self.title = Domo arigato, Mr Ruboto!
+(rdb:4) next
+1: self.title = Degugging Mr Ruboto!
+(rdb:4) next
+1: self.title = Degugging Mr Ruboto!
+----
+
+FIX: Current line is output to Android stdout (see log), should be sent to debugger client.
+
+FIX: Debugger client list command does not list source from jar.
+
+Corresponding lines in log.
+----
+20150901 155623.222000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:21
+20150901 155652.553000 I/System.out( 1895): onCreate: debugger session begin
+20150901 155652.554000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:22
+20150901 155653.324000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:23
+20150901 155709.494000 I/System.out( 1895): onCreate: debugger session end
+----
+
+==== Session in butterfly method
+
+----
+(rdb:6) display
+1: self.title = Degugging Mr Ruboto!
+(rdb:6) display @text_view.text
+2: @text_view.text = What hath Matz wrought!
+(rdb:6) display
+1: self.title = Degugging Mr Ruboto!
+2: @text_view.text = What hath Matz wrought!
+(rdb:6) next
+1: self.title = Degugging Mr Ruboto!
+2: @text_view.text = What hath Matz wrought!
+(rdb:6) next
+1: self.title = Degugging Mr Ruboto!
+2: @text_view.text = Butterfly debugged!
+(rdb:6) eval self.title = "It works."
+CalledFromWrongThreadException Exception: Only the original thread that created a view hierarchy can touch its views.
+(rdb:6) eval run_on_ui_thread { self.title = "It works." }
+nil
+(rdb:6) display
+1: self.title = It works.
+2: @text_view.text = Butterfly debugged!
+(rdb:6) next
+----
+
+Corresponding lines in log.
+----
+20150901 155713.368000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:43
+20150901 155811.635000 I/System.out( 1895): butterfly: debugger session begin
+20150901 155811.636000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:44
+20150901 155815.032000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:45
+20150901 155920.081000 I/System.out( 1895): butterfly: debugger session end
+----
+
+TODO: Debugging in UI thread ?
+
+TODO: Debugging from a thread while UI or other application threads are running ?
+
+== Things to do
+
+* PRs for changes to ruboto and ruby-debug, as changes are made in distributed gems this tutorial can be simplified.
+* Experiment with ruby-debug-ide, debugging from an IDE (RubyMine?) may be possible. 
+

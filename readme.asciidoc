@@ -1,6 +1,6 @@
-Ruboto Project Debugging _(the hard way)_
-=========================================
+= Ruboto Project Debugging _(the hard way)_
 :toc:
+:toc-placement: preamble
 
 This tutorial describes how to enable remote debugging for a Ruboto app using ruby-debug and its command-line debugger client. Some small changes are required for Ruboto and ruby-debug gems. This tutorial will be updated as these changes make their way into the distributed gems and development to support Ruboto app debugging continues. This should become a simpler process providing more effective debugging.
 

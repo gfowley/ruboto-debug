@@ -974,6 +974,8 @@ Already present in the Ruby Standard Library.</pre>
 <div class="listingblock">
 <div class="content">
 <pre>Connected.
+dtest.rb:25
+puts "post debugger"
 (rdb:1) _</pre>
 </div>
 </div>
@@ -983,9 +985,7 @@ Already present in the Ruby Standard Library.</pre>
 <div class="listingblock">
 <div class="content">
 <pre>debugger start_remote
-pre debugger
-dtest.rb:25
-puts "post debugger"</pre>
+pre debugger</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1006,7 +1006,11 @@ puts "post debugger"</pre>
    28    do_it n
    29    sleep 1
 (rdb:1) next
+dtest.rb:27
+20.times do |n|
 (rdb:1) next
+dtest.rb:28
+do_it n
 (rdb:1) list
 [23, 32] in dtest.rb
    23  puts "pre debugger"
@@ -1023,12 +1027,20 @@ puts "post debugger"</pre>
 1: n = 0
 (rdb:1) next
 1: n = 0
+dtest.rb:29
+sleep 1
 (rdb:1) next
 1: n = 1
+dtest.rb:28
+do_it n
 (rdb:1) next
 1: n = 1
+dtest.rb:29
+sleep 1
 (rdb:1) next 8
 1: n = 5
+dtest.rb:29
+sleep 1
 (rdb:1) continue</pre>
 </div>
 </div>
@@ -1038,24 +1050,12 @@ puts "post debugger"</pre>
 <div class="listingblock">
 <div class="content">
 <pre>post debugger
-dtest.rb:27
-20.times do |n|
-dtest.rb:28
-do_it n
 0
-dtest.rb:29
-sleep 1
-dtest.rb:28
-do_it n
 1
-dtest.rb:29
-sleep 1
 4
 9
 16
 25
-dtest.rb:29
-sleep 1
 36
 49
 64
@@ -1072,9 +1072,6 @@ sleep 1
 361
 program finish</pre>
 </div>
-</div>
-<div class="paragraph">
-<p>Confusingly, at each stop the current file, line #, and line are printed to the script stdout instead of the debugger client. This conflicts with the docs and is a bug.</p>
 </div>
 </div>
 <div class="sect2">
@@ -1286,14 +1283,20 @@ emulator-5554 tcp:8990 tcp:8990</pre>
 <div class="listingblock">
 <div class="content">
 <pre>Connected.
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:21
+
 (rdb:4) list
 [-9, 0] in jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb
 (rdb:4) display self.title
 1: self.title = Domo arigato, Mr Ruboto!
 (rdb:4) next
 1: self.title = Domo arigato, Mr Ruboto!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:22
+
 (rdb:4) next
 1: self.title = Degugging Mr Ruboto!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:23
+
 (rdb:4) next
 1: self.title = Degugging Mr Ruboto!</pre>
 </div>
@@ -1305,7 +1308,7 @@ emulator-5554 tcp:8990 tcp:8990</pre>
 <div class="title">Note</div>
 </td>
 <td class="content">
-FIX: Current line is output to Android stdout (see log), should be sent to debugger client.
+FIXED: <em>Current line is output to Android stdout (see log), should be sent to debugger client.</em>
 </td>
 </tr>
 </table>
@@ -1317,7 +1320,7 @@ FIX: Current line is output to Android stdout (see log), should be sent to debug
 <div class="title">Note</div>
 </td>
 <td class="content">
-FIX: Debugger client list command does not list source from jar.
+FIX: Debugger does not show source from jar.
 </td>
 </tr>
 </table>
@@ -1327,10 +1330,7 @@ FIX: Debugger client list command does not list source from jar.
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>20150901 155623.222000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:21
-20150901 155652.553000 I/System.out( 1895): onCreate: debugger session begin
-20150901 155652.554000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:22
-20150901 155653.324000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:23
+<pre>20150901 155652.553000 I/System.out( 1895): onCreate: debugger session begin
 20150901 155709.494000 I/System.out( 1895): onCreate: debugger session end</pre>
 </div>
 </div>
@@ -1345,7 +1345,9 @@ FIX: Debugger client list command does not list source from jar.
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>(rdb:6) display
+<pre>jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:43
+
+(rdb:6) display
 1: self.title = Degugging Mr Ruboto!
 (rdb:6) display @text_view.text
 2: @text_view.text = What hath Matz wrought!
@@ -1355,9 +1357,13 @@ FIX: Debugger client list command does not list source from jar.
 (rdb:6) next
 1: self.title = Degugging Mr Ruboto!
 2: @text_view.text = What hath Matz wrought!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:44
+
 (rdb:6) next
 1: self.title = Degugging Mr Ruboto!
 2: @text_view.text = Butterfly debugged!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:45
+
 (rdb:6) eval self.title = "It works."
 CalledFromWrongThreadException Exception: Only the original thread that created a view hierarchy can touch its views.
 (rdb:6) eval run_on_ui_thread { self.title = "It works." }
@@ -1373,10 +1379,7 @@ nil
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>20150901 155713.368000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:43
-20150901 155811.635000 I/System.out( 1895): butterfly: debugger session begin
-20150901 155811.636000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:44
-20150901 155815.032000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:45
+<pre>20150901 155811.635000 I/System.out( 1895): butterfly: debugger session begin
 20150901 155920.081000 I/System.out( 1895): butterfly: debugger session end</pre>
 </div>
 </div>
@@ -1441,7 +1444,7 @@ TODO: Can the debugger client remain active and be used to inspect and change va
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-09-04 08:06:54 EDT
+Last updated 2015-09-07 23:14:00 EDT
 </div>
 </div>
 </body>

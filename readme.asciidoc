@@ -401,6 +401,8 @@ $ rdebug --client
 ----
 ----
 Connected.
+dtest.rb:25
+puts "post debugger"
 (rdb:1) _
 ----
 
@@ -409,8 +411,6 @@ Script output when debugger connects.
 ----
 debugger start_remote
 pre debugger
-dtest.rb:25
-puts "post debugger"
 ----
 
 Verify that debugger works. See debugger client docs at http://bashdb.sourceforge.net/ruby-debug.html. Example session:
@@ -429,7 +429,11 @@ Verify that debugger works. See debugger client docs at http://bashdb.sourceforg
    28    do_it n
    29    sleep 1
 (rdb:1) next
+dtest.rb:27
+20.times do |n|
 (rdb:1) next
+dtest.rb:28
+do_it n
 (rdb:1) list
 [23, 32] in dtest.rb
    23  puts "pre debugger"
@@ -446,12 +450,20 @@ Verify that debugger works. See debugger client docs at http://bashdb.sourceforg
 1: n = 0
 (rdb:1) next
 1: n = 0
+dtest.rb:29
+sleep 1
 (rdb:1) next
 1: n = 1
+dtest.rb:28
+do_it n
 (rdb:1) next
 1: n = 1
+dtest.rb:29
+sleep 1
 (rdb:1) next 8
 1: n = 5
+dtest.rb:29
+sleep 1
 (rdb:1) continue
 ----
 
@@ -459,24 +471,12 @@ Corresponding script output.
 
 ----
 post debugger
-dtest.rb:27
-20.times do |n|
-dtest.rb:28
-do_it n
 0
-dtest.rb:29
-sleep 1
-dtest.rb:28
-do_it n
 1
-dtest.rb:29
-sleep 1
 4
 9
 16
 25
-dtest.rb:29
-sleep 1
 36
 49
 64
@@ -493,8 +493,6 @@ sleep 1
 361
 program finish
 ----
-
-Confusingly, at each stop the current file, line #, and line are printed to the script stdout instead of the debugger client. This conflicts with the docs and is a bug.
 
 === Build and install app
 
@@ -645,28 +643,31 @@ The first debugger session occurs in the debugger thread in the _onCreate_ metho
 
 ----
 Connected.
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:21
+
 (rdb:4) list
 [-9, 0] in jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb
 (rdb:4) display self.title
 1: self.title = Domo arigato, Mr Ruboto!
 (rdb:4) next
 1: self.title = Domo arigato, Mr Ruboto!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:22
+
 (rdb:4) next
 1: self.title = Degugging Mr Ruboto!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:23
+
 (rdb:4) next
 1: self.title = Degugging Mr Ruboto!
 ----
 
-NOTE: FIX: Current line is output to Android stdout (see log), should be sent to debugger client.
+NOTE: FIXED: _Current line is output to Android stdout (see log), should be sent to debugger client._
 
-NOTE: FIX: Debugger client list command does not list source from jar.
+NOTE: FIX: Debugger does not show source from jar.
 
 Corresponding lines in log.
 ----
-20150901 155623.222000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:21
 20150901 155652.553000 I/System.out( 1895): onCreate: debugger session begin
-20150901 155652.554000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:22
-20150901 155653.324000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:23
 20150901 155709.494000 I/System.out( 1895): onCreate: debugger session end
 ----
 
@@ -677,6 +678,8 @@ When the debugger thread finishes the onCreate method resumes and the debugger c
 Click the button. The second debugger sessions occurs in the _butterfly_ event handler method.
 
 ----
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:43
+
 (rdb:6) display
 1: self.title = Degugging Mr Ruboto!
 (rdb:6) display @text_view.text
@@ -687,9 +690,13 @@ Click the button. The second debugger sessions occurs in the _butterfly_ event h
 (rdb:6) next
 1: self.title = Degugging Mr Ruboto!
 2: @text_view.text = What hath Matz wrought!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:44
+
 (rdb:6) next
 1: self.title = Degugging Mr Ruboto!
 2: @text_view.text = Butterfly debugged!
+jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:45
+
 (rdb:6) eval self.title = "It works."
 CalledFromWrongThreadException Exception: Only the original thread that created a view hierarchy can touch its views.
 (rdb:6) eval run_on_ui_thread { self.title = "It works." }
@@ -702,10 +709,7 @@ nil
 
 Corresponding lines in log.
 ----
-20150901 155713.368000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:43
 20150901 155811.635000 I/System.out( 1895): butterfly: debugger session begin
-20150901 155811.636000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:44
-20150901 155815.032000 I/System.out( 1895): jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:45
 20150901 155920.081000 I/System.out( 1895): butterfly: debugger session end
 ----
 

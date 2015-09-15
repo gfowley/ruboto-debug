@@ -4,8 +4,8 @@
 # Assumes Gemfile and Gemfile.apk contain...
 #
 #   source "file:///home/gerard/dev/ruboto-debug/gemdir"
-#   gem 'columnize', '0.9.0'
-#   gem 'linecache', '0.46'
+#   gem 'columnize',       '0.9.0'
+#   gem 'linecache',       '0.46'
 #   gem 'ruby-debug-base', '0.10.6'
 #   gem 'ruby-debug',      '0.10.6'
 #
@@ -13,12 +13,15 @@
 
 # cd current dir so rvm can set ruby version@gemset from .ruby-version/gemset files
 cd .
+rm -v gemdir/gems/linecache*.gem
+cp -vp ../linecache/pkg/linecache-0.46-java.gem gemdir/gems
 rm -v gemdir/gems/ruby-debug*.gem
 cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
 cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
 gem generate --directory=gemdir
 rm -v Gemfile.lock
 rm -v Gemfile.apk.lock
+gem uninstall linecache
 gem uninstall ruby-debug --executables
 gem uninstall ruby-debug-base
 bundle

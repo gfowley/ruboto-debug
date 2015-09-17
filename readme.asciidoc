@@ -84,6 +84,7 @@ rescue LoadError, ArgumentError
 
 Debugger irb command uses Ruby IRB which tries to load readline. Wrap _irb.rb_ to rescue _ArgumentError_ raised on Android.
 
+.cli/ruby-debug/commands/irb.rb:1
 [source,ruby]
 ----
 begin # rescue ArgumentError

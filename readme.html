@@ -523,8 +523,8 @@ end</code></pre>
 <div class="listingblock">
 <div class="content">
 <pre>total 28K
-drwxrwxr-x 4 gerard gerard 4.0K Sep 15 08:57 linecache-0.46-java
--rw-rw-r-- 1 gerard gerard  23K Sep 15 08:57 linecache-0.46-java.gem</pre>
+drwxrwxr-x 4 gerard gerard 4.0K Sep 15 08:57 linecache-1.3.1.pre-java
+-rw-rw-r-- 1 gerard gerard  23K Sep 15 08:57 linecache-1.3.1.pre-java.gem</pre>
 </div>
 </div>
 </div>
@@ -865,7 +865,7 @@ end</code></pre>
 <div class="content">
 <pre class="highlight"><code class="language-ruby" data-lang="ruby">source "file:///home/user/dev/ruboto-debug/gemdir"
 gem 'columnize',       '0.9.0'
-gem 'linecache',       '0.46'
+gem 'linecache',       '1.3.1.pre'
 gem 'ruby-debug-base', '0.10.6'
 gem 'ruby-debug',      '0.10.6'</code></pre>
 </div>
@@ -918,7 +918,7 @@ rm -v gemdir/gems/ruby-debug*.gem
 cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
 cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
 rm -v gemdir/gems/linecache*.gem
-cp -vp ../linecache/pkg/linecache-0.46-java.gem gemdir/gems
+cp -vp ../linecache/pkg/linecache-1.3.1.pre-java.gem gemdir/gems
 gem generate --directory=gemdir
 rm -v Gemfile.lock
 rm -v Gemfile.apk.lock
@@ -944,8 +944,8 @@ rake bundle</code></pre>
 removed ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
 ‘../ruby-debug/pkg/ruby-debug-0.10.6.gem’ -&gt; ‘gemdir/gems/ruby-debug-0.10.6.gem’
 ‘../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem’ -&gt; ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
-removed ‘gemdir/gems/linecache-0.46-java.gem’
-‘../linecache/pkg/linecache-0.46-java.gem’ -&gt; ‘gemdir/gems/linecache-0.46-java.gem’
+removed ‘gemdir/gems/linecache-1.3.1.pre-java.gem’
+‘../linecache/pkg/linecache-1.3.1.pre-java.gem’ -&gt; ‘gemdir/gems/linecache-1.3.1.pre-java.gem’
 Generating Marshal quick index gemspecs for 4 gems
 ....
 Complete
@@ -963,11 +963,11 @@ removed ‘Gemfile.apk.lock’
 Removing rdebug
 Successfully uninstalled ruby-debug-0.10.6
 Successfully uninstalled ruby-debug-base-0.10.6-java
-Successfully uninstalled linecache-0.46-java
+Successfully uninstalled linecache-1.3.1.pre-java
 Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
 Resolving dependencies...
 Using columnize 0.9.0
-Installing linecache 0.46
+Installing linecache 1.3.1.pre
 Installing ruby-debug-base 0.10.6
 Installing ruby-debug 0.10.6
 Using bundler 1.10.6
@@ -980,7 +980,7 @@ Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
 Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
 Resolving dependencies...
 Installing columnize 0.9.0
-Installing linecache 0.46
+Installing linecache 1.3.1.pre
 Installing ruby-debug-base 0.10.6
 Installing ruby-debug 0.10.6
 Using bundler 1.10.6
@@ -1499,7 +1499,7 @@ TODO: Can the debugger client remain active and be used to inspect and change va
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-09-16 08:49:44 EDT
+Last updated 2015-09-17 18:12:01 EDT
 </div>
 </div>
 </body>

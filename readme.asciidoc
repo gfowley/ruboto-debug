@@ -82,14 +82,20 @@ Requires readline but does not rescue the exception raised on Android. Rescue al
 rescue LoadError, ArgumentError
 ----
 
-Debugger irb command uses Ruby IRB which tries to load readline. Quickest fix is to disable the command by renaming the command script so it will not be loaded:
+Debugger irb command uses Ruby IRB which tries to load readline. Wrap _irb.rb_ to rescue _ArgumentError_ raised on Android.
 
-[source,shell]
+[source,ruby]
 ----
-$ mv cli/ruby-debug/commands/irb.rb cli/ruby-debug/commands/irb.rb.disabled
+begin # rescue ArgumentError
+
+...
+
+rescue ArgumentError
+  # (GF) require 'irb' attempts to load readline, raises ArgumentError in JRuby on Android (Ruboto)
+end
 ----
 
-NOTE: TODO: Rescue exceptions raised loading all commands.
+NOTE: FIXED: _Rescue exceptions raised loading irb command._
 
 === Changes to ruby-debug-base (java)
 

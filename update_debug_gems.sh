@@ -16,14 +16,11 @@ cd .
 rm -v gemdir/gems/ruby-debug*.gem
 cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
 cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
-rm -v gemdir/gems/linecache*.gem
-cp -vp ../linecache/pkg/linecache-1.3.1-java.gem gemdir/gems
 gem generate --directory=gemdir
 rm -v Gemfile.lock
 rm -v Gemfile.apk.lock
 gem uninstall ruby-debug --executables
 gem uninstall ruby-debug-base
-gem uninstall linecache
 bundle
 rm -v libs/bundle.jar
 rake bundle

@@ -6,62 +6,7 @@ This tutorial describes how to enable remote debugging for a Ruboto app using ru
 
 == Linecache
 
-The linecache gem caches lines read from source files during debugging. The linecache repository is cloned locally to make changes and generate gems. The original is at https://github.com/rocky/linecache. For this tutorial a repository with the required changes is available. This repository will always contain the changes described in this tutorial. Clone it locally.
-
-[source,shell]
-----
-$ git clone https://github.com/gfowley/linecache
-----
-
-=== Changes to linecache (java)
-
-In JRuby source files may be contained in a jar file. These source files may be specified with a nested URL of the form _jar:file:/path/to/containing.jar!/path/to/source.rb_. JRuby handles such URLs transparently. Linecache reads a source file twice, using IO#rewind between passes. IO#rewind does not work properly for a file in a jar, resulting in linecache failing to retrieve source lines for the debugger. Refactored to read source file once only, not needing IO#rewind:
-
-.lib/linecache.rb:499-504
-[source,ruby]
-----
-# (GF) rewind does not work in JRuby with a jar:file:... filename
-# (GF) read file once and only create string if required by opts[:output]
-lines = { :plain => File.readlines(path) }
-if opts[:output]
-  lines[opts[:output]] = highlight_string(lines[:plain].join, opts[:output]).split(/\n/)
-end
-----
-
-Modified _Rakefile_ to build Jruby gem:
-
-.Rakefile:186-192
-[source,ruby]
-----
-namespace :jruby do
-  jruby_spec = default_spec.clone
-  jruby_spec.platform   = "java"
-  jruby_spec.files      = jruby_spec.files.reject {|f| f =~ /^ext/ }
-  jruby_spec.extensions = []
-  Gem::PackageTask.new(jruby_spec) {}
-end
-----
-
-=== Building gem
-
-Create gem.
-
-[source,shell]
-----
-$ rake jruby:clobber jruby:gem
-----
-
-Check gem is created.
-
-[source,shell]
-----
-$ ls pkg -lh
-----
-----
-total 28K
-drwxrwxr-x 4 gerard gerard 4.0K Sep 15 08:57 linecache-1.3.1-java
--rw-rw-r-- 1 gerard gerard  23K Sep 15 08:57 linecache-1.3.1-java.gem
-----
+The linecache gem caches lines read from source files during debugging. Changes for Ruboto compatibility have been included since version 1.3.1. See linecache issue: https://github.com/rocky/linecache/issues/4
 
 == Ruby Debug
 
@@ -73,6 +18,14 @@ $ git clone https://github.com/gfowley/ruby-debug
 ----
 
 === Changes to ruby-debug
+
+Dependency on Ruboto compatible linecache gem version.
+
+.ruby-debug.gemspec:33
+[source,ruby]
+----
+spec.add_dependency 'linecache', '~> 1.3.1'
+----
 
 Requires readline but does not rescue the exception raised on Android. Rescue all exceptions raised by _require "readline"_.
 
@@ -329,6 +282,7 @@ Create project gem directory and populate with dependency gems.
 $ mkdir -p gemdir/gems
 $ cd gemdir/gems
 $ gem fetch columnize --version 0.9.0
+$ gem fetch linecache --version 1.3.1 --platform java
 $ cd ../..
 ----
 
@@ -351,14 +305,11 @@ cd .
 rm -v gemdir/gems/ruby-debug*.gem
 cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
 cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
-rm -v gemdir/gems/linecache*.gem
-cp -vp ../linecache/pkg/linecache-1.3.1-java.gem gemdir/gems
 gem generate --directory=gemdir
 rm -v Gemfile.lock
 rm -v Gemfile.apk.lock
 gem uninstall ruby-debug --executables
 gem uninstall ruby-debug-base
-gem uninstall linecache
 bundle
 rm -v libs/bundle.jar
 rake bundle
@@ -375,8 +326,6 @@ removed ‘gemdir/gems/ruby-debug-0.10.6.gem’
 removed ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
 ‘../ruby-debug/pkg/ruby-debug-0.10.6.gem’ -> ‘gemdir/gems/ruby-debug-0.10.6.gem’
 ‘../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem’ -> ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
-removed ‘gemdir/gems/linecache-1.3.1-java.gem’
-‘../linecache/pkg/linecache-1.3.1-java.gem’ -> ‘gemdir/gems/linecache-1.3.1-java.gem’
 Generating Marshal quick index gemspecs for 4 gems
 ....
 Complete
@@ -394,11 +343,10 @@ removed ‘Gemfile.apk.lock’
 Removing rdebug
 Successfully uninstalled ruby-debug-0.10.6
 Successfully uninstalled ruby-debug-base-0.10.6-java
-Successfully uninstalled linecache-1.3.1-java
 Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
 Resolving dependencies...
 Using columnize 0.9.0
-Installing linecache 1.3.1
+Using linecache 1.3.1
 Installing ruby-debug-base 0.10.6
 Installing ruby-debug 0.10.6
 Using bundler 1.10.6

@@ -417,20 +417,12 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
-<p>This tutorial describes how to enable remote debugging for a Ruboto app using ruby-debug and its command-line debugger client. Some changes to the ruboto, ruby-debug, and linecache gems are required. This tutorial will be updated as these changes make their way into the distributed gems and development Ruboto of app debugging continues. This should become a simpler process providing more effective debugging.</p>
+<p>This tutorial describes how to enable remote debugging for a Ruboto app using ruby-debug and its command-line debugger client. Some changes to the Ruboto gem are required. This tutorial will be updated as these changes make their way into the distributed gems and development Ruboto of app debugging continues. This should become a simpler process providing more effective debugging.</p>
 </div>
 </div>
 <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
-<li><a href="#_linecache">Linecache</a></li>
-<li><a href="#_ruby_debug">Ruby Debug</a>
-<ul class="sectlevel2">
-<li><a href="#_changes_to_ruby_debug">Changes to ruby-debug</a></li>
-<li><a href="#_changes_to_ruby_debug_base_java">Changes to ruby-debug-base (java)</a></li>
-<li><a href="#_building_gems">Building gems</a></li>
-</ul>
-</li>
 <li><a href="#_ruboto_project">Ruboto project</a>
 <ul class="sectlevel2">
 <li><a href="#_dev_environment">Dev environment</a></li>
@@ -438,7 +430,6 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_permissions">Permissions</a></li>
 <li><a href="#_activity">Activity</a></li>
 <li><a href="#_bundle">Bundle</a></li>
-<li><a href="#_non_ruboto_debug_test">Non-Ruboto debug test</a></li>
 <li><a href="#_build_and_install_app">Build and install app</a></li>
 <li><a href="#_start_app">Start app</a></li>
 </ul>
@@ -450,142 +441,8 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_debugger_sessions">Debugger sessions</a></li>
 </ul>
 </li>
-<li><a href="#_more_things_to_do">More things to do</a></li>
+<li><a href="#_things_to_do">Things to do</a></li>
 </ul>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_linecache">Linecache</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>The linecache gem caches lines read from source files during debugging. Changes for Ruboto compatibility have been included since version 1.3.1. See linecache issue: <a href="https://github.com/rocky/linecache/issues/4" class="bare">https://github.com/rocky/linecache/issues/4</a></p>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_ruby_debug">Ruby Debug</h2>
-<div class="sectionbody">
-<div class="paragraph">
-<p>Gems ruby-debug and ruby-debug-base are generated from a single source repository. The repository is cloned locally to make changes and generate gems. The original is at <a href="https://github.com/ruby-debug/ruby-debug" class="bare">https://github.com/ruby-debug/ruby-debug</a>. For this tutorial a repository with the required changes is available. This repository will always contain the changes described in this tutorial. Clone it locally.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ git clone https://github.com/gfowley/ruby-debug</code></pre>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_changes_to_ruby_debug">Changes to ruby-debug</h3>
-<div class="paragraph">
-<p>Dependency on Ruboto compatible linecache gem version.</p>
-</div>
-<div class="listingblock">
-<div class="title">ruby-debug.gemspec:33</div>
-<div class="content">
-<pre class="highlight"><code class="language-ruby" data-lang="ruby">spec.add_dependency 'linecache', '~&gt; 1.3.1'</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Requires readline but does not rescue the exception raised on Android. Rescue all exceptions raised by <em>require "readline"</em>.</p>
-</div>
-<div class="listingblock">
-<div class="title">cli/ruby-debug/interface.rb:16 &amp; 135</div>
-<div class="content">
-<pre class="highlight"><code class="language-ruby" data-lang="ruby">rescue LoadError, ArgumentError</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Debugger irb command uses Ruby IRB which tries to load readline. Wrap <em>irb.rb</em> to rescue <em>ArgumentError</em> raised on Android.</p>
-</div>
-<div class="listingblock">
-<div class="title">cli/ruby-debug/commands/irb.rb:1</div>
-<div class="content">
-<pre class="highlight"><code class="language-ruby" data-lang="ruby">begin # rescue ArgumentError
-
-...
-
-rescue ArgumentError
-  # (GF) require 'irb' attempts to load readline, raises ArgumentError in JRuby on Android (Ruboto)
-end</code></pre>
-</div>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-FIXED: <em>Rescue exceptions raised loading irb command.</em>
-</td>
-</tr>
-</table>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_changes_to_ruby_debug_base_java">Changes to ruby-debug-base (java)</h3>
-<div class="paragraph">
-<p>The current version (0.10.6) of gem ruby-debug-base for java is not available via <em>gem install</em>. No changes are required but it must be built locally.</p>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-TODO: Request inclusion of Java platform gem in ruby-debug-base gem distribution.
-</td>
-</tr>
-</table>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_building_gems">Building gems</h3>
-<div class="paragraph">
-<p>Test changes. Even unchanged, <em>cli</em> tests fail, only run <em>base</em> tests.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ rake test:base</code></pre>
-</div>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>...
-# Running tests:
-.......
-Finished tests in 0.068000s, 102.9412 tests/s, 558.8235 assertions/s.
-7 tests, 38 assertions, 0 failures, 0 errors, 0 skips</pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Create gems.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ rake clobber java gem</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Check gems are created.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ ls pkg -lh</code></pre>
-</div>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>total 176K
-drwxrwxr-x 5 user user 4.0K Sep  1 12:36 ruby-debug-0.10.6
--rw-rw-r-- 1 user user  53K Sep  1 12:36 ruby-debug-0.10.6.gem
-drwxrwxr-x 4 user user 4.0K Sep  1 12:36 ruby-debug-base-0.10.6
--rw-rw-r-- 1 user user  33K Sep  1 12:36 ruby-debug-base-0.10.6.gem
-drwxrwxr-x 4 user user 4.0K Sep  1 12:36 ruby-debug-base-0.10.6-java
--rw-rw-r-- 1 user user  69K Sep  1 12:36 ruby-debug-base-0.10.6-java.gem</pre>
-</div>
-</div>
-</div>
 </div>
 </div>
 <div class="sect1">
@@ -806,259 +663,70 @@ end</code></pre>
 <div class="sect2">
 <h3 id="_bundle">Bundle</h3>
 <div class="paragraph">
-<p>Use locally created ruby-debug gems for bundle and bundle.jar.</p>
+<p>Specify ruby-debug and depencency gem versions compatible with Ruboto.</p>
+</div>
+<div class="paragraph">
+<p>The linecache gem supports Ruboto since version 1.3.1.
+For details, see linecache issue: <a href="https://github.com/rocky/linecache/issues/4" class="bare">https://github.com/rocky/linecache/issues/4</a>.</p>
+</div>
+<div class="paragraph">
+<p>The ruby-debug gem supports Ruboto since version 0.10.6.
+For details, see ruby-debug issue: <a href="https://github.com/ruby-debug/ruby-debug/pull/23" class="bare">https://github.com/ruby-debug/ruby-debug/pull/23</a></p>
 </div>
 <div class="listingblock">
 <div class="title">Gemfile &amp; Gemfile.apk</div>
 <div class="content">
-<pre class="highlight"><code class="language-ruby" data-lang="ruby">source "file:///home/user/dev/ruboto-debug/gemdir"
-gem 'columnize',       '0.9.0'
-gem 'linecache',       '1.3.1'
-gem 'ruby-debug-base', '0.10.6'
-gem 'ruby-debug',      '0.10.6'</code></pre>
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">source 'https://rubygems.org'
+gem 'columnize',       '~&gt; 0.9.0'
+gem 'linecache',       '~&gt; 1.3.1'
+gem 'ruby-debug-base', '~&gt; 0.10.6'
+gem 'ruby-debug',      '~&gt; 0.10.6'</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Create project gem directory and populate with dependency gems.</p>
+<p>Install bundled gems in local dev environment.</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ mkdir -p gemdir/gems
-$ cd gemdir/gems
-$ gem fetch columnize --version 0.9.0
-$ gem fetch linecache --version 1.3.1 --platform java
-$ cd ../..</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Locally created ruby-debug gems are located in the local ruby-debug repository at ../ruby-debug/pkg. To bundle them:</p>
-</div>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>Copy/update ruby-debug gems in the project gem directory.</p>
-</li>
-<li>
-<p>Generate a gem server index.</p>
-</li>
-<li>
-<p>Delete bundler locks.</p>
-</li>
-<li>
-<p>Uninstall ruby-debug gems (from project gemset if using rvm).</p>
-</li>
-<li>
-<p>Bundle.</p>
-</li>
-<li>
-<p>Create Ruboto bundle.jar.</p>
-</li>
-</ol>
-</div>
-<div class="paragraph">
-<p>A shell script is provided to consistently create the local bundle and bundle.jar.</p>
-</div>
-<div class="listingblock">
-<div class="title">update_debug_gems.sh</div>
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">#! /bin/bash
-cd .
-rm -v gemdir/gems/ruby-debug*.gem
-cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
-cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
-gem generate --directory=gemdir
-rm -v Gemfile.lock
-rm -v Gemfile.apk.lock
-gem uninstall ruby-debug --executables
-gem uninstall ruby-debug-base
-bundle
-rm -v libs/bundle.jar
-rake bundle</code></pre>
-</div>
-</div>
-<div class="paragraph">
-<p>This should be executed for changes to locally created ruby-debug gems or any other gems to be bundled for the application.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ ./update_debug_gems.sh</code></pre>
+<pre class="highlight"><code class="language-shell" data-lang="shell">$ bundle</code></pre>
 </div>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>removed ‘gemdir/gems/ruby-debug-0.10.6.gem’
-removed ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
-‘../ruby-debug/pkg/ruby-debug-0.10.6.gem’ -&gt; ‘gemdir/gems/ruby-debug-0.10.6.gem’
-‘../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem’ -&gt; ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
-Generating Marshal quick index gemspecs for 4 gems
-....
-Complete
-Generated Marshal quick index gemspecs: 0.011s
-Generating specs index
-Generated specs index: 0.003s
-Generating latest specs index
-Generated latest specs index: 0.000s
-Generating prerelease specs index
-Generated prerelease specs index: 0.000s
-Compressing indicies
-Compressed indicies: 0.018s
-removed ‘Gemfile.lock’
-removed ‘Gemfile.apk.lock’
-Removing rdebug
-Successfully uninstalled ruby-debug-0.10.6
-Successfully uninstalled ruby-debug-base-0.10.6-java
-Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
-Resolving dependencies...
-Using columnize 0.9.0
-Using linecache 1.3.1
-Installing ruby-debug-base 0.10.6
-Installing ruby-debug 0.10.6
-Using bundler 1.10.6
-Bundle complete! 4 Gemfile dependencies, 5 gems now installed.
-Gems in the groups development and test were not installed.
-Use `bundle show [gemname]` to see where a bundled gem is installed.
-removed ‘libs/bundle.jar’
-Jars have changed: bundle.jar
-Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
-Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
+<pre>Fetching gem metadata from https://rubygems.org/....
+Fetching version metadata from https://rubygems.org/..
 Resolving dependencies...
 Installing columnize 0.9.0
 Installing linecache 1.3.1
 Installing ruby-debug-base 0.10.6
 Installing ruby-debug 0.10.6
 Using bundler 1.10.6
-Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems
-Expanding ruby-debug-base-0.10.6-java ruby_debug.jar into /home/gerard/dev/ruboto-debug/libs/bundle.jar
-Writing dummy JAR file ruby_debug.jar.rb
-Writing dummy JAR file ruby_debug.rb
-Removing duplicate file META-INF/MANIFEST.MF in gem ruby-debug-base-0.10.6-java.
-Already present in the Ruby Standard Library.</pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_non_ruboto_debug_test">Non-Ruboto debug test</h3>
-<div class="paragraph">
-<p>To verify that locally created ruby-debug gems are functional, debug the provided sample script.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ ruby -Xcompile.mode=OFF --debug ./dtest.rb</code></pre>
-</div>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>program start</pre>
+Bundle complete! 4 Gemfile dependencies, 5 gems now installed.
+Gems in the groups development and test were not installed.
+Use `bundle show [gemname]` to see where a bundled gem is installed.</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Start debugger cient in another shell (with same ruby and gems).</p>
+<p>Verify that gems bundle for app.</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code class="language-shell" data-lang="shell">$ rdebug --client</code></pre>
+<pre class="highlight"><code class="language-shell" data-lang="shell">$ rake bundle</code></pre>
 </div>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>Connected.
-dtest.rb:25
-puts "post debugger"
-(rdb:1) _</pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Script output when debugger connects.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>debugger start_remote
-pre debugger</pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Verify that debugger works. See debugger client docs at <a href="http://bashdb.sourceforge.net/ruby-debug.html" class="bare">http://bashdb.sourceforge.net/ruby-debug.html</a>. Example session:</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>(rdb:1) list
-[20, 29] in dtest.rb
-   20    puts x * x
-   21  end
-   22
-   23  puts "pre debugger"
-   24  debugger
-=&gt; 25  puts "post debugger"
-   26
-   27  20.times do |n|
-   28    do_it n
-   29    sleep 1
-(rdb:1) next
-dtest.rb:27
-20.times do |n|
-(rdb:1) next
-dtest.rb:28
-do_it n
-(rdb:1) list
-[23, 32] in dtest.rb
-   23  puts "pre debugger"
-   24  debugger
-   25  puts "post debugger"
-   26
-   27  20.times do |n|
-=&gt; 28    do_it n
-   29    sleep 1
-   30  end
-   31
-   32  puts "program finish"
-(rdb:1) display n
-1: n = 0
-(rdb:1) next
-1: n = 0
-dtest.rb:29
-sleep 1
-(rdb:1) next
-1: n = 1
-dtest.rb:28
-do_it n
-(rdb:1) next
-1: n = 1
-dtest.rb:29
-sleep 1
-(rdb:1) next 8
-1: n = 5
-dtest.rb:29
-sleep 1
-(rdb:1) continue</pre>
-</div>
-</div>
-<div class="paragraph">
-<p>Corresponding script output.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>post debugger
-0
-1
-4
-9
-16
-25
-36
-49
-64
-81
-100
-121
-144
-169
-196
-225
-256
-289
-324
-361
-program finish</pre>
+<pre>Jars have changed: bundle.jar
+Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Fetching gem metadata from https://rubygems.org/....
+Fetching version metadata from https://rubygems.org/..
+Resolving dependencies...
+Using columnize 0.9.0
+Using linecache 1.3.1
+Using ruby-debug-base 0.10.6
+Using ruby-debug 0.10.6
+Using bundler 1.10.6
+Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems</pre>
 </div>
 </div>
 </div>
@@ -1091,7 +759,7 @@ emulator-5554   device</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Build Ruboto app, verify that libs/bundle.jar is dexed, (re)install, and ready log capture.</p>
+<p>Build Ruboto app, bundle gems for app, verify that libs/bundle.jar is dexed, (re)install, and ready log capture.</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -1104,9 +772,9 @@ emulator-5554   device</pre>
 -dex:
     [apply] Result: 2
      [echo] The package contains too many methods.  Switching to multi-dex build.
-     [echo] Converting compiled files and external libraries into /home/user/dev/ruboto-debug/bin (multi-dex)
-     [echo] Dexing /home/user/dev/ruboto-debug/bin/classes and /home/user/dev/ruboto-debug/libs/dx.jar:/home/user/dev/ruboto-debug/libs/jruby-stdlib-1.7.19.jar:/home/user/dev/ruboto-
-debug/libs/bundle.jar:/home/user/dev/ruboto-debug/libs/jruby-core-1.7.19.jar
+     [echo] Converting compiled files and external libraries into /home/gerard/dev/ruboto-debug/bin (multi-dex)
+     [echo] Dexing /home/gerard/dev/ruboto-debug/bin/classes and /home/gerard/dev/ruboto-debug/libs/jruby-stdlib-1.7.22.jar:/home/gerard
+/dev/ruboto-debug/libs/jruby-core-1.7.22.jar:/home/gerard/dev/ruboto-debug/libs/dx.jar:/home/gerard/dev/ruboto-debug/libs/bundle.jar
 ...</pre>
 </div>
 </div>
@@ -1114,7 +782,7 @@ debug/libs/bundle.jar:/home/user/dev/ruboto-debug/libs/jruby-core-1.7.19.jar
 <div class="sect2">
 <h3 id="_start_app">Start app</h3>
 <div class="paragraph">
-<p>Launch application on device. Observe the following logs.</p>
+<p>Launch application on device. App will stop in onCreate method and wait for debugger client connection, device screen will be blank. Relevant log highlights include:</p>
 </div>
 <div class="paragraph">
 <p>UnixSocketChannel warnings, triggered by RubyDebugService (harmless?).</p>
@@ -1167,18 +835,6 @@ debug/libs/bundle.jar:/home/user/dev/ruboto-debug/libs/jruby-core-1.7.19.jar
 <div class="content">
 <pre>20150901 155601.083000 I/System.out( 1895): file:/data/app/net.iqeo.debugging-1.apk!/ruby-debug-base.rb:196 warning: tracing (e.g. set_trace_func) will not capture all events without --debug flag</pre>
 </div>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-TODO: Start application JRuby with --debug ?
-</td>
-</tr>
-</table>
 </div>
 <div class="paragraph">
 <p>UnixSocketChannel warnings, triggered by <em>Debugger.start_remote</em> (harmless?).</p>
@@ -1299,30 +955,6 @@ puts "onCreate: debugger session end"
 1: self.title = Degugging Mr Ruboto!</pre>
 </div>
 </div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-FIXED: <em>Current line is output to Android stdout (see log), should be sent to debugger client.</em>
-</td>
-</tr>
-</table>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-FIXED: <em>Debugger does not show source from jar.</em>
-</td>
-</tr>
-</table>
-</div>
 <div class="paragraph">
 <p>Corresponding lines in log.</p>
 </div>
@@ -1340,6 +972,9 @@ FIXED: <em>Debugger does not show source from jar.</em>
 <h4 id="_session_in_butterfly_method">Session in butterfly method</h4>
 <div class="paragraph">
 <p>Click the button. The second debugger sessions occurs in the <em>butterfly</em> event handler method.</p>
+</div>
+<div class="paragraph">
+<p>Android may pop up an ANR (Application Not Responding) dialog after a while in the debugger session. Just click <em>Wait</em> to continue.</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -1381,59 +1016,29 @@ nil
 20150901 155920.081000 I/System.out( 1895): butterfly: debugger session end</pre>
 </div>
 </div>
-<div class="paragraph">
-<p>Android may pop up an ANR (Application Not Responding) dialog after a while in the debugger session. Just click <em>Wait</em> to continue.</p>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-TODO: Suppress ANRs when debugging ?
-</td>
-</tr>
-</table>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-TODO: Debugging in UI thread ?
-</td>
-</tr>
-</table>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-TODO: Can the debugger client remain active and be used to inspect and change variables while UI or other application threads are running ?
-</td>
-</tr>
-</table>
-</div>
 </div>
 </div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="_more_things_to_do">More things to do</h2>
+<h2 id="_things_to_do">Things to do</h2>
 <div class="sectionbody">
 <div class="ulist">
 <ul>
 <li>
-<p>PRs for changes to ruboto and ruby-debug, as changes are made in distributed gems this tutorial can be simplified.</p>
+<p>PRs for changes to ruboto, as changes are made in distributed gems this tutorial can be simplified.</p>
 </li>
 <li>
-<p>Experiment with ruby-debug-ide, debugging from an IDE  may be possible.</p>
+<p>Suppress ANRs while debugging ?</p>
+</li>
+<li>
+<p>Start application JRuby with --debug ?</p>
+</li>
+<li>
+<p>Can the debugger client remain active and be used to inspect and change variables while UI or other application threads are running ?</p>
+</li>
+<li>
+<p>Experiment with ruby-debug-ide, debugging from an IDE may be possible.</p>
 </li>
 </ul>
 </div>
@@ -1442,7 +1047,7 @@ TODO: Can the debugger client remain active and be used to inspect and change va
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2015-09-21 13:59:49 EDT
+Last updated 2016-01-10 18:53:59 -05:00
 </div>
 </div>
 </body>

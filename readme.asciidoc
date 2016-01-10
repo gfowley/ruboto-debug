@@ -2,99 +2,7 @@
 :toc:
 :toc-placement: preamble
 
-This tutorial describes how to enable remote debugging for a Ruboto app using ruby-debug and its command-line debugger client. Some changes to the ruboto, ruby-debug, and linecache gems are required. This tutorial will be updated as these changes make their way into the distributed gems and development Ruboto of app debugging continues. This should become a simpler process providing more effective debugging.
-
-== Linecache
-
-The linecache gem caches lines read from source files during debugging. Changes for Ruboto compatibility have been included since version 1.3.1. See linecache issue: https://github.com/rocky/linecache/issues/4
-
-== Ruby Debug
-
-Gems ruby-debug and ruby-debug-base are generated from a single source repository. The repository is cloned locally to make changes and generate gems. The original is at https://github.com/ruby-debug/ruby-debug. For this tutorial a repository with the required changes is available. This repository will always contain the changes described in this tutorial. Clone it locally.
-
-[source,shell]
-----
-$ git clone https://github.com/gfowley/ruby-debug
-----
-
-=== Changes to ruby-debug
-
-Dependency on Ruboto compatible linecache gem version.
-
-.ruby-debug.gemspec:33
-[source,ruby]
-----
-spec.add_dependency 'linecache', '~> 1.3.1'
-----
-
-Requires readline but does not rescue the exception raised on Android. Rescue all exceptions raised by _require "readline"_.
-
-.cli/ruby-debug/interface.rb:16 & 135
-[source,ruby]
-----
-rescue LoadError, ArgumentError
-----
-
-Debugger irb command uses Ruby IRB which tries to load readline. Wrap _irb.rb_ to rescue _ArgumentError_ raised on Android.
-
-.cli/ruby-debug/commands/irb.rb:1
-[source,ruby]
-----
-begin # rescue ArgumentError
-
-...
-
-rescue ArgumentError
-  # (GF) require 'irb' attempts to load readline, raises ArgumentError in JRuby on Android (Ruboto)
-end
-----
-
-NOTE: FIXED: _Rescue exceptions raised loading irb command._
-
-=== Changes to ruby-debug-base (java)
-
-The current version (0.10.6) of gem ruby-debug-base for java is not available via _gem install_. No changes are required but it must be built locally.
-
-NOTE: TODO: Request inclusion of Java platform gem in ruby-debug-base gem distribution.
-
-=== Building gems
-
-Test changes. Even unchanged, _cli_ tests fail, only run _base_ tests.
-
-[source,shell]
-----
-$ rake test:base
-----
-----
-...
-# Running tests:
-.......
-Finished tests in 0.068000s, 102.9412 tests/s, 558.8235 assertions/s.
-7 tests, 38 assertions, 0 failures, 0 errors, 0 skips
-----
-
-Create gems.
-
-[source,shell]
-----
-$ rake clobber java gem
-----
-
-Check gems are created.
-
-[source,shell]
-----
-$ ls pkg -lh
-----
-----
-total 176K
-drwxrwxr-x 5 user user 4.0K Sep  1 12:36 ruby-debug-0.10.6
--rw-rw-r-- 1 user user  53K Sep  1 12:36 ruby-debug-0.10.6.gem
-drwxrwxr-x 4 user user 4.0K Sep  1 12:36 ruby-debug-base-0.10.6
--rw-rw-r-- 1 user user  33K Sep  1 12:36 ruby-debug-base-0.10.6.gem
-drwxrwxr-x 4 user user 4.0K Sep  1 12:36 ruby-debug-base-0.10.6-java
--rw-rw-r-- 1 user user  69K Sep  1 12:36 ruby-debug-base-0.10.6-java.gem
-----
+This tutorial describes how to enable remote debugging for a Ruboto app using ruby-debug and its command-line debugger client. Some changes to the Ruboto gem are required. This tutorial will be updated as these changes make their way into the distributed gems and development Ruboto of app debugging continues. This should become a simpler process providing more effective debugging.
 
 == Ruboto project
 
@@ -263,225 +171,62 @@ end
 
 === Bundle
 
-Use locally created ruby-debug gems for bundle and bundle.jar.
+Specify ruby-debug and depencency gem versions compatible with Ruboto.
+
+The linecache gem supports Ruboto since version 1.3.1.
+For details, see linecache issue: https://github.com/rocky/linecache/issues/4.
+
+The ruby-debug gem supports Ruboto since version 0.10.6.
+For details, see ruby-debug issue: https://github.com/ruby-debug/ruby-debug/pull/23
 
 .Gemfile & Gemfile.apk
 [source,ruby]
 ----
-source "file:///home/user/dev/ruboto-debug/gemdir"
-gem 'columnize',       '0.9.0'
-gem 'linecache',       '1.3.1'
-gem 'ruby-debug-base', '0.10.6'
-gem 'ruby-debug',      '0.10.6'
+source 'https://rubygems.org'
+gem 'columnize',       '~> 0.9.0'
+gem 'linecache',       '~> 1.3.1'
+gem 'ruby-debug-base', '~> 0.10.6'
+gem 'ruby-debug',      '~> 0.10.6'
 ----
 
-Create project gem directory and populate with dependency gems.
-
-[source,shell]
-----
-$ mkdir -p gemdir/gems
-$ cd gemdir/gems
-$ gem fetch columnize --version 0.9.0
-$ gem fetch linecache --version 1.3.1 --platform java
-$ cd ../..
-----
-
-Locally created ruby-debug gems are located in the local ruby-debug repository at ../ruby-debug/pkg. To bundle them:
-
-. Copy/update ruby-debug gems in the project gem directory.
-. Generate a gem server index.
-. Delete bundler locks.
-. Uninstall ruby-debug gems (from project gemset if using rvm).
-. Bundle.
-. Create Ruboto bundle.jar.
-
-A shell script is provided to consistently create the local bundle and bundle.jar.
-
-.update_debug_gems.sh
-[source,shell]
-----
-#! /bin/bash
-cd .
-rm -v gemdir/gems/ruby-debug*.gem
-cp -vp ../ruby-debug/pkg/ruby-debug-0.10.6.gem gemdir/gems
-cp -vp ../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem gemdir/gems
-gem generate --directory=gemdir
-rm -v Gemfile.lock
-rm -v Gemfile.apk.lock
-gem uninstall ruby-debug --executables
-gem uninstall ruby-debug-base
-bundle
-rm -v libs/bundle.jar
-rake bundle
-----
-
-This should be executed for changes to locally created ruby-debug gems or any other gems to be bundled for the application.
+Install bundled gems in local dev environment.
 
 [source,shell]
 ----
-$ ./update_debug_gems.sh
+$ bundle
 ----
 ----
-removed ‘gemdir/gems/ruby-debug-0.10.6.gem’
-removed ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
-‘../ruby-debug/pkg/ruby-debug-0.10.6.gem’ -> ‘gemdir/gems/ruby-debug-0.10.6.gem’
-‘../ruby-debug/pkg/ruby-debug-base-0.10.6-java.gem’ -> ‘gemdir/gems/ruby-debug-base-0.10.6-java.gem’
-Generating Marshal quick index gemspecs for 4 gems
-....
-Complete
-Generated Marshal quick index gemspecs: 0.011s
-Generating specs index
-Generated specs index: 0.003s
-Generating latest specs index
-Generated latest specs index: 0.000s
-Generating prerelease specs index
-Generated prerelease specs index: 0.000s
-Compressing indicies
-Compressed indicies: 0.018s
-removed ‘Gemfile.lock’
-removed ‘Gemfile.apk.lock’
-Removing rdebug
-Successfully uninstalled ruby-debug-0.10.6
-Successfully uninstalled ruby-debug-base-0.10.6-java
-Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
-Resolving dependencies...
-Using columnize 0.9.0
-Using linecache 1.3.1
-Installing ruby-debug-base 0.10.6
-Installing ruby-debug 0.10.6
-Using bundler 1.10.6
-Bundle complete! 4 Gemfile dependencies, 5 gems now installed.
-Gems in the groups development and test were not installed.
-Use `bundle show [gemname]` to see where a bundled gem is installed.
-removed ‘libs/bundle.jar’
-Jars have changed: bundle.jar
-Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
-Fetching source index from file:/home/gerard/dev/ruboto-debug/gemdir/
+Fetching gem metadata from https://rubygems.org/....
+Fetching version metadata from https://rubygems.org/..
 Resolving dependencies...
 Installing columnize 0.9.0
 Installing linecache 1.3.1
 Installing ruby-debug-base 0.10.6
 Installing ruby-debug 0.10.6
 Using bundler 1.10.6
+Bundle complete! 4 Gemfile dependencies, 5 gems now installed.
+Gems in the groups development and test were not installed.
+Use `bundle show [gemname]` to see where a bundled gem is installed.
+----
+
+Verify that gems bundle for app.
+
+[source,shell]
+----
+$ rake bundle
+----
+----
+Jars have changed: bundle.jar
+Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Fetching gem metadata from https://rubygems.org/....
+Fetching version metadata from https://rubygems.org/..
+Resolving dependencies...
+Using columnize 0.9.0
+Using linecache 1.3.1
+Using ruby-debug-base 0.10.6
+Using ruby-debug 0.10.6
+Using bundler 1.10.6
 Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems
-Expanding ruby-debug-base-0.10.6-java ruby_debug.jar into /home/gerard/dev/ruboto-debug/libs/bundle.jar
-Writing dummy JAR file ruby_debug.jar.rb
-Writing dummy JAR file ruby_debug.rb
-Removing duplicate file META-INF/MANIFEST.MF in gem ruby-debug-base-0.10.6-java.
-Already present in the Ruby Standard Library.
-----
-
-=== Non-Ruboto debug test 
-
-To verify that locally created ruby-debug gems are functional, debug the provided sample script.
-
-[source,shell]
-----
-$ ruby -Xcompile.mode=OFF --debug ./dtest.rb
-----
-----
-program start
-----
-
-Start debugger cient in another shell (with same ruby and gems).
-
-[source,shell]
-----
-$ rdebug --client
-----
-----
-Connected.
-dtest.rb:25
-puts "post debugger"
-(rdb:1) _
-----
-
-Script output when debugger connects.
-
-----
-debugger start_remote
-pre debugger
-----
-
-Verify that debugger works. See debugger client docs at http://bashdb.sourceforge.net/ruby-debug.html. Example session:
-
-----
-(rdb:1) list
-[20, 29] in dtest.rb
-   20    puts x * x
-   21  end
-   22  
-   23  puts "pre debugger"
-   24  debugger
-=> 25  puts "post debugger"
-   26  
-   27  20.times do |n|
-   28    do_it n
-   29    sleep 1
-(rdb:1) next
-dtest.rb:27
-20.times do |n|
-(rdb:1) next
-dtest.rb:28
-do_it n
-(rdb:1) list
-[23, 32] in dtest.rb
-   23  puts "pre debugger"
-   24  debugger
-   25  puts "post debugger"
-   26  
-   27  20.times do |n|
-=> 28    do_it n
-   29    sleep 1
-   30  end
-   31  
-   32  puts "program finish"
-(rdb:1) display n
-1: n = 0
-(rdb:1) next
-1: n = 0
-dtest.rb:29
-sleep 1
-(rdb:1) next
-1: n = 1
-dtest.rb:28
-do_it n
-(rdb:1) next
-1: n = 1
-dtest.rb:29
-sleep 1
-(rdb:1) next 8
-1: n = 5
-dtest.rb:29
-sleep 1
-(rdb:1) continue
-----
-
-Corresponding script output.
-
-----
-post debugger
-0
-1
-4
-9
-16
-25
-36
-49
-64
-81
-100
-121
-144
-169
-196
-225
-256
-289
-324
-361
-program finish
 ----
 
 === Build and install app
@@ -499,7 +244,7 @@ List of devices attached
 emulator-5554   device
 ----
 
-Build Ruboto app, verify that libs/bundle.jar is dexed, (re)install, and ready log capture.
+Build Ruboto app, bundle gems for app, verify that libs/bundle.jar is dexed, (re)install, and ready log capture.
 
 [source,shell]
 ----
@@ -510,15 +255,15 @@ $ rake clean debug reinstall log
 -dex:
     [apply] Result: 2
      [echo] The package contains too many methods.  Switching to multi-dex build.
-     [echo] Converting compiled files and external libraries into /home/user/dev/ruboto-debug/bin (multi-dex)
-     [echo] Dexing /home/user/dev/ruboto-debug/bin/classes and /home/user/dev/ruboto-debug/libs/dx.jar:/home/user/dev/ruboto-debug/libs/jruby-stdlib-1.7.19.jar:/home/user/dev/ruboto-
-debug/libs/bundle.jar:/home/user/dev/ruboto-debug/libs/jruby-core-1.7.19.jar
+     [echo] Converting compiled files and external libraries into /home/gerard/dev/ruboto-debug/bin (multi-dex)
+     [echo] Dexing /home/gerard/dev/ruboto-debug/bin/classes and /home/gerard/dev/ruboto-debug/libs/jruby-stdlib-1.7.22.jar:/home/gerard
+/dev/ruboto-debug/libs/jruby-core-1.7.22.jar:/home/gerard/dev/ruboto-debug/libs/dx.jar:/home/gerard/dev/ruboto-debug/libs/bundle.jar
 ...
 ----
 
 === Start app
 
-Launch application on device. Observe the following logs.
+Launch application on device. App will stop in onCreate method and wait for debugger client connection, device screen will be blank. Relevant log highlights include:
 
 UnixSocketChannel warnings, triggered by RubyDebugService (harmless?).
 ----
@@ -559,7 +304,6 @@ Tracing without --debug flag. According to ruby-debug docs this will prevent its
 ----
 20150901 155601.083000 I/System.out( 1895): file:/data/app/net.iqeo.debugging-1.apk!/ruby-debug-base.rb:196 warning: tracing (e.g. set_trace_func) will not capture all events without --debug flag
 ----
-NOTE: TODO: Start application JRuby with --debug ?
 
 UnixSocketChannel warnings, triggered by _Debugger.start_remote_ (harmless?).
 ----
@@ -661,10 +405,6 @@ puts "onCreate: debugger session end"
 1: self.title = Degugging Mr Ruboto!
 ----
 
-NOTE: FIXED: _Current line is output to Android stdout (see log), should be sent to debugger client._
-
-NOTE: FIXED: _Debugger does not show source from jar._
-
 Corresponding lines in log.
 ----
 20150901 155652.553000 I/System.out( 1895): onCreate: debugger session begin
@@ -676,6 +416,8 @@ When the debugger thread finishes the onCreate method resumes and the debugger c
 ==== Session in butterfly method
 
 Click the button. The second debugger sessions occurs in the _butterfly_ event handler method.
+
+Android may pop up an ANR (Application Not Responding) dialog after a while in the debugger session. Just click _Wait_ to continue.
 
 ----
 jar:file:/data/app/net.iqeo.debugging-1.apk!/debugging_activity.rb:43
@@ -713,16 +455,11 @@ Corresponding lines in log.
 20150901 155920.081000 I/System.out( 1895): butterfly: debugger session end
 ----
 
-Android may pop up an ANR (Application Not Responding) dialog after a while in the debugger session. Just click _Wait_ to continue.
+== Things to do
 
-NOTE: TODO: Suppress ANRs when debugging ?
-
-NOTE: TODO: Debugging in UI thread ?
-
-NOTE: TODO: Can the debugger client remain active and be used to inspect and change variables while UI or other application threads are running ?
-
-== More things to do
-
-* PRs for changes to ruboto and ruby-debug, as changes are made in distributed gems this tutorial can be simplified.
-* Experiment with ruby-debug-ide, debugging from an IDE  may be possible. 
+* PRs for changes to ruboto, as changes are made in distributed gems this tutorial can be simplified.
+* Suppress ANRs while debugging ?
+* Start application JRuby with --debug ?
+* Can the debugger client remain active and be used to inspect and change variables while UI or other application threads are running ?
+* Experiment with ruby-debug-ide, debugging from an IDE may be possible. 
 

@@ -12,6 +12,6 @@
         <activity android:exported='false' android:name='org.ruboto.RubotoDialog' android:theme='@android:style/Theme.Dialog'/>
         <service android:exported='false' android:name='org.ruboto.RubotoService'/>
     </application>
-    <uses-sdk android:minSdkVersion='19' android:targetSdkVersion='19'/>
+    <uses-sdk android:minSdkVersion='15' android:targetSdkVersion='15'/>
     <uses-permission android:name='android.permission.INTERNET'/>
 </manifest>

@@ -67,7 +67,7 @@ Dir.chdir "#{gem_lib}/#{require_path}" do
 .rakelib/ruboto.rake:881
 [source,ruby]
 ----
-require_path = gem_lib =~ /ruby-debug-\d/ ? 'cli' : 'lib' 
+require_path = gem_dir =~ /ruby-debug-\d/ ? 'cli' : 'lib' 
 `jar #{i == 0 ? 'c' : 'u'}f "#{BUNDLE_JAR}" -C "#{gem_dir}/#{require_path}" .`
 ----
 

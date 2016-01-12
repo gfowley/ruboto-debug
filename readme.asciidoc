@@ -217,10 +217,11 @@ Already present in the Ruby Standard Library.
 
 The debugger runs a TCP server to communicate with the debugger client. This requires that the application has the _android.permission.INTERNET_ permission. It is added to AndroidManifest.xml if not already present.
 
----
+[source,xml]
+----
 <!-- INTERNET permission required for debugging. Remove for release build if not required. -->
 <uses-permission android:name='android.permission.INTERNET'/>
----
+----
 
 === Build and install app
 

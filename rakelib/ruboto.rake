@@ -815,12 +815,12 @@ require 'jruby'
 puts 'Starting threadsafe JRubyCacheBackend Service'
 public
 begin
-  Java::thread_safe.JrubyCacheBackendService.new.basicLoad(JRuby.runtime)
+Java::thread_safe.JrubyCacheBackendService.new.basicLoad(JRuby.runtime)
 rescue Exception
-  puts "Exception starting threadsafe JRubyCacheBackend Service"
-  puts $!
-  puts $!.backtrace.join("\n")
-  raise
+puts "Exception starting threadsafe JRubyCacheBackend Service"
+puts $!
+puts $!.backtrace.join("\n")
+raise
 end
             END_CODE
           elsif jar =~ %r{ruby_debug.jar$}
@@ -830,6 +830,13 @@ puts 'Starting Ruby Debug Service'
 public
 Java::RubyDebugService.new.basicLoad(JRuby.runtime)
             END_CODE
+            # (GF) add internet permission required to run debug service
+            unless manifest.root.elements["uses-permission[@android:name='android.permission.INTERNET']"]
+              REXML::Comment.new " INTERNET permission required for debugging. Remove for release build if not required. ", manifest.root
+              manifest.root.add_element 'uses-permission', { 'android:name' => 'android.permission.INTERNET' }
+              File.open( MANIFEST_FILE, 'w' ) { |file| manifest.write file, 4 }
+              puts "Added INTERNET permission required for debugging to AndroidManifest.xml"
+            end
           else
             jar_load_code = ''
           end

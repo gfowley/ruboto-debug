@@ -427,11 +427,11 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <ul class="sectlevel2">
 <li><a href="#_dev_environment">Dev environment</a></li>
 <li><a href="#_changes_to_ruboto">Changes to Ruboto</a></li>
-<li><a href="#_permissions">Permissions</a></li>
 <li><a href="#_activity">Activity</a></li>
 <li><a href="#_bundle">Bundle</a></li>
 <li><a href="#_build_and_install_app">Build and install app</a></li>
 <li><a href="#_start_app">Start app</a></li>
+<li><a href="#_troubleshooting">Troubleshooting</a></li>
 </ul>
 </li>
 <li><a href="#_debugging">Debugging</a>
@@ -478,7 +478,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>bundle.jar  dx.jar  jruby-core-1.7.22.jar  jruby-stdlib-1.7.22.jar</pre>
+<pre>... jruby-core-1.7.22.jar  jruby-stdlib-1.7.22.jar</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -513,44 +513,24 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p>The rake-debug gem specifies a non-default require path <em>cli</em> in its gemspec. Handle this special case when creating bundle.jar in ruboto.rake.</p>
 </div>
 <div class="listingblock">
-<div class="title">rakelib/ruboto.rake:748</div>
+<div class="title">rakelib/ruboto.rake:755</div>
 <div class="content">
 <pre class="highlight"><code class="language-ruby" data-lang="ruby">require_path = gem_lib =~ /^ruby-debug-\d/ ? 'cli' : 'lib'
 Dir.chdir "#{gem_lib}/#{require_path}" do</code></pre>
 </div>
 </div>
 <div class="listingblock">
-<div class="title">rakelib/ruboto.rake:881</div>
+<div class="title">rakelib/ruboto.rake:895</div>
 <div class="content">
-<pre class="highlight"><code class="language-ruby" data-lang="ruby">require_path = gem_lib =~ /ruby-debug-\d/ ? 'cli' : 'lib'
+<pre class="highlight"><code class="language-ruby" data-lang="ruby">require_path = gem_dir =~ /ruby-debug-\d/ ? 'cli' : 'lib'
 `jar #{i == 0 ? 'c' : 'u'}f "#{BUNDLE_JAR}" -C "#{gem_dir}/#{require_path}" .`</code></pre>
 </div>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-<div class="paragraph">
-<p>TODO: Get gem require paths from gemspec - GemSpecification#require_paths. Something like&#8230;&#8203;</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>gem_spec = YAML.load `gem specification #{gem_name} --version #{gem_version} --yaml`
-gem_spec.require_paths.each { |dir| ... }</pre>
-</div>
-</div>
-</td>
-</tr>
-</table>
 </div>
 <div class="paragraph">
 <p>Load RubyDebugService from bundle.jar at JRuby startup</p>
 </div>
 <div class="listingblock">
-<div class="title">rakelib/ruboto.rake:818</div>
+<div class="title">rakelib/ruboto.rake:826</div>
 <div class="content">
 <pre class="highlight"><code class="language-ruby" data-lang="ruby">elsif jar =~ %r{ruby_debug.jar$}
   jar_load_code = &lt;&lt;-END_CODE
@@ -558,25 +538,14 @@ require 'jruby'
 puts 'Starting Ruby Debug Service'
 public
 Java::RubyDebugService.new.basicLoad(JRuby.runtime)
-END_CODE</code></pre>
-</div>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_permissions">Permissions</h3>
-<div class="paragraph">
-<p>When started in the application the debugger runs a TCP server to communicate with the debugger client. The application requires the <em>android.permission.INTERNET</em> permission, otherwise an EACCES exception will be raised.</p>
-</div>
-<div class="listingblock">
-<div class="content">
-<pre>org.jruby.exceptions.RaiseException: (Errno::EACCES) bind(2)
-   at org.jruby.ext.socket.RubyTCPServer.initialize(org/jruby/ext/socket/RubyTCPServer.java:124)</pre>
-</div>
-</div>
-<div class="listingblock">
-<div class="title">AndroidManifest.xml</div>
-<div class="content">
-<pre class="highlight"><code class="language-xml" data-lang="xml">&lt;uses-permission android:name='android.permission.INTERNET'/&gt;</code></pre>
+  END_CODE
+  # (GF) add internet permission required to run debug service
+  unless manifest.root.elements["uses-permission[@android:name='android.permission.INTERNET']"]
+    REXML::Comment.new " INTERNET permission required for debugging. Remove for release build if not required. ", manifest.root
+    manifest.root.add_element 'uses-permission', { 'android:name' =&gt; 'android.permission.INTERNET' }
+    File.open( MANIFEST_FILE, 'w' ) { |file| manifest.write file, 4 }
+    puts "Added INTERNET permission required for debugging to AndroidManifest.xml"
+  end</code></pre>
 </div>
 </div>
 </div>
@@ -666,12 +635,10 @@ end</code></pre>
 <p>Specify ruby-debug and depencency gem versions compatible with Ruboto.</p>
 </div>
 <div class="paragraph">
-<p>The linecache gem supports Ruboto since version 1.3.1.
-For details, see linecache issue: <a href="https://github.com/rocky/linecache/issues/4" class="bare">https://github.com/rocky/linecache/issues/4</a>.</p>
+<p>The linecache gem supports Ruboto since version 1.3.1. For details, see linecache issue: <a href="https://github.com/rocky/linecache/issues/4" class="bare">https://github.com/rocky/linecache/issues/4</a>.</p>
 </div>
 <div class="paragraph">
-<p>The ruby-debug gem supports Ruboto since version 0.10.6.
-For details, see ruby-debug issue: <a href="https://github.com/ruby-debug/ruby-debug/pull/23" class="bare">https://github.com/ruby-debug/ruby-debug/pull/23</a></p>
+<p>The ruby-debug gem supports Ruboto since version 0.10.6. For details, see ruby-debug issue: <a href="https://github.com/ruby-debug/ruby-debug/pull/23" class="bare">https://github.com/ruby-debug/ruby-debug/pull/23</a></p>
 </div>
 <div class="listingblock">
 <div class="title">Gemfile &amp; Gemfile.apk</div>
@@ -707,7 +674,7 @@ Use `bundle show [gemname]` to see where a bundled gem is installed.</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Verify that gems bundle for app.</p>
+<p>Bundle gems for app.</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -716,18 +683,31 @@ Use `bundle show [gemname]` to see where a bundled gem is installed.</pre>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre>Jars have changed: bundle.jar
-Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
+<pre>Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
 Fetching gem metadata from https://rubygems.org/....
 Fetching version metadata from https://rubygems.org/..
-Resolving dependencies...
-Using columnize 0.9.0
-Using linecache 1.3.1
-Using ruby-debug-base 0.10.6
-Using ruby-debug 0.10.6
+Installing columnize 0.9.0
+Installing linecache 1.3.1
+Installing ruby-debug-base 0.10.6
+Installing ruby-debug 0.10.6
 Using bundler 1.10.6
-Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems</pre>
+Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems
+Expanding ruby-debug-base-0.10.6-java ruby_debug.jar into /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Added INTERNET permission required for debugging to AndroidManifest.xml
+Writing dummy JAR file ruby_debug.jar.rb
+Writing dummy JAR file ruby_debug.rb
+Removing duplicate file META-INF/MANIFEST.MF in gem ruby-debug-base-0.10.6-java.
+Already present in the Ruby Standard Library.</pre>
 </div>
+</div>
+<div class="paragraph">
+<p>The debugger runs a TCP server to communicate with the debugger client. This requires that the application has the <em>android.permission.INTERNET</em> permission. It is added to AndroidManifest.xml if not already present.</p>
+</div>
+<hr>
+<div class="paragraph">
+<p>&lt;!-- INTERNET permission required for debugging. Remove for release build if not required. -&#8594;
+&lt;uses-permission android:name='android.permission.INTERNET'/&gt;
+---</p>
 </div>
 </div>
 <div class="sect2">
@@ -782,7 +762,15 @@ emulator-5554   device</pre>
 <div class="sect2">
 <h3 id="_start_app">Start app</h3>
 <div class="paragraph">
-<p>Launch application on device. App will stop in onCreate method and wait for debugger client connection, device screen will be blank. Relevant log highlights include:</p>
+<p>Launch app on device. App will stop in onCreate method and wait for debugger client connection, device screen will be blank.</p>
+</div>
+<div class="paragraph">
+<p>If the app fails to start see troubleshooting section of this tutorial.</p>
+</div>
+<div class="sect3">
+<h4 id="_logging">Logging</h4>
+<div class="paragraph">
+<p>For a successful app start, relevant log highlights include:</p>
 </div>
 <div class="paragraph">
 <p>UnixSocketChannel warnings, triggered by RubyDebugService (harmless?).</p>
@@ -867,6 +855,32 @@ emulator-5554   device</pre>
 20150901 155601.118000 I/dalvikvm( 1895): Could not find method jnr.unixsocket.UnixSocketChannel.shutdownOutput, referenced from method org.jruby.ext.socket.SocketType$4.shutdownOutput
 20150901 155601.118000 W/dalvikvm( 1895): VFY: unable to resolve virtual method 10687: Ljnr/unixsocket/UnixSocketChannel;.shutdownOutput ()V
 20150901 155601.123000 D/dalvikvm( 1895): VFY: replacing opcode 0x6e at 0x0004</pre>
+</div>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_troubleshooting">Troubleshooting</h3>
+<div class="paragraph">
+<p>When started in the application the debugger runs a TCP server to communicate with the debugger client.
+The application requires the <em>android.permission.INTERNET</em> permission, otherwise an EACCES exception will be raised.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre>org.jruby.exceptions.RaiseException: (Errno::EACCES) bind(2)
+   at org.jruby.ext.socket.RubyTCPServer.initialize(org/jruby/ext/socket/RubyTCPServer.java:124)</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Add the <em>android.permission.INTERNET</em> permission to the <em>&lt;manifest&gt;</em> element of the AndroidManifest.xml.
+.AndroidManifest.xml</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-xml" data-lang="xml">&lt;manifest...
+  ...
+  &lt;uses-permission android:name='android.permission.INTERNET'/&gt;
+&lt;/manifest&gt;</code></pre>
 </div>
 </div>
 </div>
@@ -1047,7 +1061,7 @@ nil
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-01-10 18:53:59 -05:00
+Last updated 2016-01-12 17:23:20 -05:00
 </div>
 </div>
 </body>

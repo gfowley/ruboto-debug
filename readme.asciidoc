@@ -30,7 +30,7 @@ jruby 1.7.22 (1.9.3p551) 2015-08-20 c28f492 on Java HotSpot(TM) 64-Bit Server VM
 $ ls libs
 ----
 ----
-bundle.jar  dx.jar  jruby-core-1.7.22.jar  jruby-stdlib-1.7.22.jar
+... jruby-core-1.7.22.jar  jruby-stdlib-1.7.22.jar
 ----
 
 RVM .ruby-* files implement a project ruby version and gemset.
@@ -57,32 +57,23 @@ jruby-1.7.22@ruboto-debug
 
 The rake-debug gem specifies a non-default require path _cli_ in its gemspec. Handle this special case when creating bundle.jar in ruboto.rake.
 
-.rakelib/ruboto.rake:748
+.rakelib/ruboto.rake:755
 [source,ruby]
 ----
 require_path = gem_lib =~ /^ruby-debug-\d/ ? 'cli' : 'lib'
 Dir.chdir "#{gem_lib}/#{require_path}" do
 ----
 
-.rakelib/ruboto.rake:881
+.rakelib/ruboto.rake:895
 [source,ruby]
 ----
 require_path = gem_dir =~ /ruby-debug-\d/ ? 'cli' : 'lib' 
 `jar #{i == 0 ? 'c' : 'u'}f "#{BUNDLE_JAR}" -C "#{gem_dir}/#{require_path}" .`
 ----
 
-[NOTE]
-====
-TODO: Get gem require paths from gemspec - GemSpecification#require_paths. Something like...
-----
-gem_spec = YAML.load `gem specification #{gem_name} --version #{gem_version} --yaml`
-gem_spec.require_paths.each { |dir| ... }
-----
-====
-
 Load RubyDebugService from bundle.jar at JRuby startup
 
-.rakelib/ruboto.rake:818
+.rakelib/ruboto.rake:826
 [source,ruby]
 ----
 elsif jar =~ %r{ruby_debug.jar$}
@@ -91,21 +82,14 @@ require 'jruby'
 puts 'Starting Ruby Debug Service'
 public
 Java::RubyDebugService.new.basicLoad(JRuby.runtime)
-END_CODE
-----
-
-=== Permissions
-
-When started in the application the debugger runs a TCP server to communicate with the debugger client. The application requires the _android.permission.INTERNET_ permission, otherwise an EACCES exception will be raised.
-----
-org.jruby.exceptions.RaiseException: (Errno::EACCES) bind(2)
-   at org.jruby.ext.socket.RubyTCPServer.initialize(org/jruby/ext/socket/RubyTCPServer.java:124)
-----
-
-.AndroidManifest.xml
-[source,xml]
-----
-<uses-permission android:name='android.permission.INTERNET'/>
+  END_CODE
+  # (GF) add internet permission required to run debug service
+  unless manifest.root.elements["uses-permission[@android:name='android.permission.INTERNET']"]
+    REXML::Comment.new " INTERNET permission required for debugging. Remove for release build if not required. ", manifest.root
+    manifest.root.add_element 'uses-permission', { 'android:name' => 'android.permission.INTERNET' }
+    File.open( MANIFEST_FILE, 'w' ) { |file| manifest.write file, 4 }
+    puts "Added INTERNET permission required for debugging to AndroidManifest.xml"
+  end
 ----
 
 === Activity
@@ -173,11 +157,9 @@ end
 
 Specify ruby-debug and depencency gem versions compatible with Ruboto.
 
-The linecache gem supports Ruboto since version 1.3.1.
-For details, see linecache issue: https://github.com/rocky/linecache/issues/4.
+The linecache gem supports Ruboto since version 1.3.1. For details, see linecache issue: https://github.com/rocky/linecache/issues/4.
 
-The ruby-debug gem supports Ruboto since version 0.10.6.
-For details, see ruby-debug issue: https://github.com/ruby-debug/ruby-debug/pull/23
+The ruby-debug gem supports Ruboto since version 0.10.6. For details, see ruby-debug issue: https://github.com/ruby-debug/ruby-debug/pull/23
 
 .Gemfile & Gemfile.apk
 [source,ruby]
@@ -209,25 +191,36 @@ Gems in the groups development and test were not installed.
 Use `bundle show [gemname]` to see where a bundled gem is installed.
 ----
 
-Verify that gems bundle for app.
+Bundle gems for app.
 
 [source,shell]
 ----
 $ rake bundle
 ----
 ----
-Jars have changed: bundle.jar
 Generating /home/gerard/dev/ruboto-debug/libs/bundle.jar
 Fetching gem metadata from https://rubygems.org/....
 Fetching version metadata from https://rubygems.org/..
-Resolving dependencies...
-Using columnize 0.9.0
-Using linecache 1.3.1
-Using ruby-debug-base 0.10.6
-Using ruby-debug 0.10.6
+Installing columnize 0.9.0
+Installing linecache 1.3.1
+Installing ruby-debug-base 0.10.6
+Installing ruby-debug 0.10.6
 Using bundler 1.10.6
 Found gems in /home/gerard/dev/ruboto-debug/bin/bundle/gems
+Expanding ruby-debug-base-0.10.6-java ruby_debug.jar into /home/gerard/dev/ruboto-debug/libs/bundle.jar
+Added INTERNET permission required for debugging to AndroidManifest.xml
+Writing dummy JAR file ruby_debug.jar.rb
+Writing dummy JAR file ruby_debug.rb
+Removing duplicate file META-INF/MANIFEST.MF in gem ruby-debug-base-0.10.6-java.
+Already present in the Ruby Standard Library.
 ----
+
+The debugger runs a TCP server to communicate with the debugger client. This requires that the application has the _android.permission.INTERNET_ permission. It is added to AndroidManifest.xml if not already present.
+
+---
+<!-- INTERNET permission required for debugging. Remove for release build if not required. -->
+<uses-permission android:name='android.permission.INTERNET'/>
+---
 
 === Build and install app
 
@@ -263,7 +256,13 @@ $ rake clean debug reinstall log
 
 === Start app
 
-Launch application on device. App will stop in onCreate method and wait for debugger client connection, device screen will be blank. Relevant log highlights include:
+Launch app on device. App will stop in onCreate method and wait for debugger client connection, device screen will be blank.
+
+If the app fails to start see troubleshooting section of this tutorial.
+
+==== Logging
+
+For a successful app start, relevant log highlights include:
 
 UnixSocketChannel warnings, triggered by RubyDebugService (harmless?).
 ----
@@ -333,6 +332,25 @@ UnixSocketChannel warnings, triggered by _Debugger.start_remote_ (harmless?).
 20150901 155601.118000 I/dalvikvm( 1895): Could not find method jnr.unixsocket.UnixSocketChannel.shutdownOutput, referenced from method org.jruby.ext.socket.SocketType$4.shutdownOutput
 20150901 155601.118000 W/dalvikvm( 1895): VFY: unable to resolve virtual method 10687: Ljnr/unixsocket/UnixSocketChannel;.shutdownOutput ()V
 20150901 155601.123000 D/dalvikvm( 1895): VFY: replacing opcode 0x6e at 0x0004
+----
+
+=== Troubleshooting
+
+When started in the application the debugger runs a TCP server to communicate with the debugger client.
+The application requires the _android.permission.INTERNET_ permission, otherwise an EACCES exception will be raised.
+----
+org.jruby.exceptions.RaiseException: (Errno::EACCES) bind(2)
+   at org.jruby.ext.socket.RubyTCPServer.initialize(org/jruby/ext/socket/RubyTCPServer.java:124)
+----
+
+Add the _android.permission.INTERNET_ permission to the _<manifest>_ element of the AndroidManifest.xml.
+.AndroidManifest.xml
+[source,xml]
+----
+<manifest...
+  ...
+  <uses-permission android:name='android.permission.INTERNET'/>
+</manifest>
 ----
 
 == Debugging
